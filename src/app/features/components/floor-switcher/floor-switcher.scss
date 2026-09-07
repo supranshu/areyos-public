@@ -1,0 +1,21 @@
+.floor-switcher {
+  display: flex;
+  gap: 8px;
+
+  &__tab {
+    flex: 1;
+    padding: 8px 0;
+    border: 1px solid var(--hairline);
+    background: var(--paper);
+    border-radius: 8px;
+    font-size: 0.85rem;
+    color: var(--body-gray);
+    cursor: pointer;
+
+    &--active {
+      border-color: var(--brand-blue);
+      color: var(--brand-blue);
+      font-weight: 500;
+    }
+  }
+}

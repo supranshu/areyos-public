@@ -1,0 +1,69 @@
+.floor-plan-viewer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  &__placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    aspect-ratio: 3 / 2;
+    background: var(--paper-tint);
+    border-radius: 12px;
+    color: var(--slate);
+  }
+
+  &__stage {
+    position: relative;
+    width: 100%;
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--paper-tint);
+  }
+
+  &__image {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  &__overlay {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  &__route-line {
+    stroke: var(--brand-blue);
+    stroke-width: 6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 2 14;
+  }
+
+  &__waypoint {
+    fill: var(--paper);
+    stroke: var(--slate);
+    stroke-width: 2;
+  }
+
+  &__start-marker {
+    fill: var(--brand-blue);
+    stroke: var(--paper);
+    stroke-width: 3;
+  }
+
+  &__destination-marker {
+    fill: #1a9c5f;
+    stroke: var(--paper);
+    stroke-width: 3;
+  }
+
+  &__floor-label {
+    font-size: var(--fs-label);
+    color: var(--slate);
+    margin: 0;
+    text-align: center;
+  }
+}

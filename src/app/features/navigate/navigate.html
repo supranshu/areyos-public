@@ -1,0 +1,63 @@
+<main class="navigate">
+  @switch (store.phase()) {
+    @case ('idle') {
+      <div class="navigate__state">
+        <p>Scan a location QR code to begin.</p>
+      </div>
+    }
+    @case ('resolving-qr') {
+      <div class="navigate__state">
+        <div class="navigate__spinner"></div>
+        <p>Reading QR code…</p>
+      </div>
+    }
+    @case ('loading-venue-data') {
+      <div class="navigate__state">
+        <div class="navigate__spinner"></div>
+        <p>Loading venue details…</p>
+      </div>
+    }
+    @case ('error') {
+      <div class="navigate__state navigate__state--error">
+        <p>{{ store.errorMessage() }}</p>
+        <button type="button" (click)="store.retry()">Try Again</button>
+      </div>
+    }
+    @default {
+      @if (store.venue(); as venue) {
+        <app-location-banner [venue]="venue" [startPoint]="store.startPoint()!" />
+      }
+
+      <div class="navigate__body">
+        <app-floor-plan-viewer
+          [imageUrl]="store.activeFloorPlan() ? store.getFloorPlanImageUrl(store.activeFloorPlan()!.floorId) : null"
+          [floorPlan]="store.activeFloorPlan()"
+          [startPoint]="store.startPoint()"
+          [destination]="store.selectedDestination()"
+          [routePoints]="store.visibleRoutePoints()"
+        />
+
+        <aside class="navigate__panel">
+          @if (store.routeFloors().length > 1) {
+            <app-floor-switcher
+              [floors]="store.routeFloors()"
+              [activeFloorId]="store.activeFloorId()"
+              (floorSelected)="store.setActiveFloor($event)"
+            />
+          }
+
+          <app-destination-selector
+            [destinations]="store.destinations()"
+            [selected]="store.selectedDestination()"
+            [disabled]="store.phase() === 'calculating-route'"
+            (destinationSelected)="store.selectDestination($event)"
+          />
+
+          @if (store.route(); as route) {
+            <app-route-summary [route]="route" (clear)="store.clearRoute()" />
+          }
+        </aside>
+      </div>
+    }
+  }
+</main>

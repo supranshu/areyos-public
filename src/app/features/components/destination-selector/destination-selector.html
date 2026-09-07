@@ -1,0 +1,39 @@
+<div class="destination-selector">
+  <label class="destination-selector__label" for="destination-search">Where do you want to go?</label>
+
+  <div class="destination-selector__input-wrap">
+    <input
+      id="destination-search"
+      class="destination-selector__input"
+      type="text"
+      placeholder="Search destinations..."
+      [value]="selected() ? selected()!.name : searchTerm()"
+      [disabled]="disabled()"
+      (input)="onSearchChange($any($event.target).value)"
+      (focus)="onFocus()"
+      (blur)="onBlur()"
+    />
+  </div>
+
+  @if (isOpen() && filteredDestinations().length > 0) {
+    <ul class="destination-selector__list">
+      @for (destination of filteredDestinations(); track destination.nodeId) {
+        <li>
+          <button
+            type="button"
+            class="destination-selector__option"
+            [class.destination-selector__option--active]="selected()?.nodeId === destination.nodeId"
+            (mousedown)="choose(destination)"
+          >
+            <span>{{ destination.name }}</span>
+            <span class="destination-selector__floor">{{ destination.floorName }}</span>
+          </button>
+        </li>
+      }
+    </ul>
+  }
+
+  @if (isOpen() && filteredDestinations().length === 0) {
+    <p class="destination-selector__empty">No destinations match your search.</p>
+  }
+</div>

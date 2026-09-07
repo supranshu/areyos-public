@@ -1,0 +1,13 @@
+<div class="route-summary">
+  <div class="route-summary__stat">
+    <span class="route-summary__value">{{ route().estimatedTimeMinutes }} min</span>
+    <span class="route-summary__label">Estimated time</span>
+  </div>
+  <div class="route-summary__stat">
+    <span class="route-summary__value">{{ route().totalDistance | number: '1.0-0' }}</span>
+    <span class="route-summary__label">Distance (units)</span>
+  </div>
+  <button class="route-summary__clear-btn" type="button" (click)="clear.emit()">
+    Choose a different destination
+  </button>
+</div>

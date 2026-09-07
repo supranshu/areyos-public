@@ -1,0 +1,40 @@
+.route-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+
+  &__stat {
+    display: flex;
+    flex-direction: column;
+  }
+
+  &__value {
+    font-size: var(--fs-sub);
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  &__label {
+    font-size: 0.8rem;
+    color: var(--slate);
+  }
+
+  &__clear-btn {
+    margin-top: 4px;
+    background: none;
+    border: 1px solid var(--hairline);
+    border-radius: 8px;
+    padding: 10px 0;
+    font-size: var(--fs-label);
+    color: var(--brand-blue);
+    cursor: pointer;
+
+    &:hover {
+      background: var(--paper-tint);
+    }
+  }
+}

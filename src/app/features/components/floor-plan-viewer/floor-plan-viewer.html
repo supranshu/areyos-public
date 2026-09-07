@@ -1,0 +1,39 @@
+<div class="floor-plan-viewer">
+  @if (!imageUrl() || !floorPlan()) {
+    <div class="floor-plan-viewer__placeholder">
+      <p>Loading floor plan…</p>
+    </div>
+  } @else {
+    <div class="floor-plan-viewer__stage">
+      <img
+        class="floor-plan-viewer__image"
+        [src]="imageUrl()"
+        [alt]="floorPlan()!.floorName + ' floor plan'"
+      />
+
+      <svg
+        class="floor-plan-viewer__overlay"
+        [attr.viewBox]="viewBox()"
+        preserveAspectRatio="xMidYMid meet"
+      >
+        @if (routePathPoints()) {
+          <polyline class="floor-plan-viewer__route-line" [attr.points]="routePathPoints()" fill="none" />
+        }
+
+        @for (point of waypoints(); track point.nodeId) {
+          <circle class="floor-plan-viewer__waypoint" [attr.cx]="point.x" [attr.cy]="point.y" r="6" />
+        }
+
+        @if (destinationMarkerOnThisFloor(); as dest) {
+          <circle class="floor-plan-viewer__destination-marker" [attr.cx]="dest.x" [attr.cy]="dest.y" r="10" />
+        }
+
+        @if (startMarkerOnThisFloor(); as start) {
+          <circle class="floor-plan-viewer__start-marker" [attr.cx]="start.x" [attr.cy]="start.y" r="10" />
+        }
+      </svg>
+    </div>
+
+    <p class="floor-plan-viewer__floor-label">{{ floorPlan()!.floorName }}</p>
+  }
+</div>

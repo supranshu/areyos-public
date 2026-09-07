@@ -1,0 +1,12 @@
+<div class="floor-switcher">
+  @for (floor of floors(); track floor.floorId) {
+    <button
+      type="button"
+      class="floor-switcher__tab"
+      [class.floor-switcher__tab--active]="floor.floorId === activeFloorId()"
+      (click)="floorSelected.emit(floor.floorId)"
+    >
+      {{ floor.floorName }}
+    </button>
+  }
+</div>
