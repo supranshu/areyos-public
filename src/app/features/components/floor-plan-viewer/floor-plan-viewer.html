@@ -1,39 +1,77 @@
-<div class="floor-plan-viewer">
+<div class="floor-plan-viewer" [class.floor-plan-viewer--fullscreen]="isFullscreen()">
   @if (!imageUrl() || !floorPlan()) {
     <div class="floor-plan-viewer__placeholder">
       <p>Loading floor plan…</p>
     </div>
   } @else {
-    <div class="floor-plan-viewer__stage">
-      <img
-        class="floor-plan-viewer__image"
-        [src]="imageUrl()"
-        [alt]="floorPlan()!.floorName + ' floor plan'"
-      />
+    <div
+      #stage
+      class="floor-plan-viewer__stage"
+      [style.aspect-ratio]="isFullscreen() ? null : stageAspectRatio()"
+      (pointerdown)="onPointerDown($event)"
+      (pointermove)="onPointerMove($event)"
+      (pointerup)="onPointerUp($event)"
+      (pointercancel)="onPointerUp($event)"
+      (wheel)="onWheel($event)"
+      (dblclick)="onDoubleClick($event)"
+    >
+      <div class="floor-plan-viewer__canvas" [style.transform]="canvasTransform()">
+        <img
+          class="floor-plan-viewer__image"
+          [src]="imageUrl()"
+          [alt]="floorPlan()!.floorName + ' floor plan'"
+          draggable="false"
+        />
 
-      <svg
-        class="floor-plan-viewer__overlay"
-        [attr.viewBox]="viewBox()"
-        preserveAspectRatio="xMidYMid meet"
+        <svg
+          class="floor-plan-viewer__overlay"
+          [attr.viewBox]="viewBox()"
+          preserveAspectRatio="xMidYMid meet"
+        >
+          @if (routePathPoints()) {
+            <polyline class="floor-plan-viewer__route-line" [attr.points]="routePathPoints()" fill="none" />
+          }
+
+          @for (point of waypoints(); track point.nodeId) {
+            <circle class="floor-plan-viewer__waypoint" [attr.cx]="point.x" [attr.cy]="point.y" r="6" />
+          }
+
+          @if (destinationMarkerOnThisFloor(); as dest) {
+            <circle class="floor-plan-viewer__destination-marker" [attr.cx]="dest.x" [attr.cy]="dest.y" r="10" />
+          }
+
+          @if (startMarkerOnThisFloor(); as start) {
+            <circle class="floor-plan-viewer__start-marker" [attr.cx]="start.x" [attr.cy]="start.y" r="10" />
+          }
+        </svg>
+      </div>
+
+      <button
+        type="button"
+        class="floor-plan-viewer__fullscreen-btn"
+        [attr.aria-label]="isFullscreen() ? 'Minimize map' : 'Maximize map'"
+        (click)="toggleFullscreen()"
       >
-        @if (routePathPoints()) {
-          <polyline class="floor-plan-viewer__route-line" [attr.points]="routePathPoints()" fill="none" />
+        @if (isFullscreen()) {
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+            <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/>
+          </svg>
+        } @else {
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+            <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+          </svg>
         }
+      </button>
 
-        @for (point of waypoints(); track point.nodeId) {
-          <circle class="floor-plan-viewer__waypoint" [attr.cx]="point.x" [attr.cy]="point.y" r="6" />
-        }
-
-        @if (destinationMarkerOnThisFloor(); as dest) {
-          <circle class="floor-plan-viewer__destination-marker" [attr.cx]="dest.x" [attr.cy]="dest.y" r="10" />
-        }
-
-        @if (startMarkerOnThisFloor(); as start) {
-          <circle class="floor-plan-viewer__start-marker" [attr.cx]="start.x" [attr.cy]="start.y" r="10" />
-        }
-      </svg>
+      @if (isZoomed()) {
+        <button type="button" class="floor-plan-viewer__reset-btn" (click)="resetView()">
+          Reset zoom
+        </button>
+      }
     </div>
 
-    <p class="floor-plan-viewer__floor-label">{{ floorPlan()!.floorName }}</p>
+    @if (!isFullscreen()) {
+      <p class="floor-plan-viewer__floor-label">{{ floorPlan()!.floorName }}</p>
+    }
   }
 </div>

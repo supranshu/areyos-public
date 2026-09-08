@@ -7,7 +7,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    aspect-ratio: 3 / 2;
+    aspect-ratio: 3 / 4;
     background: var(--paper-tint);
     border-radius: 12px;
     color: var(--slate);
@@ -19,12 +19,31 @@
     border-radius: 12px;
     overflow: hidden;
     background: var(--paper-tint);
+    // Blocks the browser's native pinch-zoom/pan on this element specifically —
+    // this is what stops the whole page from zooming during a gesture here.
+    touch-action: none;
+    cursor: grab;
+
+    &:active {
+      cursor: grabbing;
+    }
+  }
+
+  &__canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    transform-origin: 0 0;
+    user-select: none;
   }
 
   &__image {
     width: 100%;
-    height: auto;
+    height: 100%;
+    object-fit: contain; // shows the whole image, no cropping
     display: block;
+    pointer-events: none; // gestures are handled by the stage, not the img
   }
 
   &__overlay {
@@ -32,6 +51,7 @@
     inset: 0;
     width: 100%;
     height: 100%;
+    pointer-events: none;
   }
 
   &__route-line {
@@ -65,5 +85,68 @@
     color: var(--slate);
     margin: 0;
     text-align: center;
+  }
+
+  &__fullscreen-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--paper);
+    color: var(--ink);
+    border: none;
+    border-radius: 50%;
+    box-shadow: 0 2px 8px rgba(10, 10, 10, 0.16);
+    cursor: pointer;
+    z-index: 5;
+
+    &:active {
+      transform: scale(0.94);
+    }
+  }
+
+  &__reset-btn {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--paper);
+    color: var(--ink);
+    border: none;
+    border-radius: 999px;
+    padding: 8px 16px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    box-shadow: 0 2px 8px rgba(10, 10, 10, 0.16);
+    cursor: pointer;
+    z-index: 5;
+  }
+
+  &--fullscreen {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: var(--ink);
+    display: block;
+
+    .floor-plan-viewer__stage {
+      width: 100vw;
+      height: 100vh;
+      border-radius: 0;
+      background: var(--ink);
+    }
+
+    .floor-plan-viewer__fullscreen-btn {
+      top: max(12px, env(safe-area-inset-top));
+      right: max(12px, env(safe-area-inset-right));
+    }
+
+    .floor-plan-viewer__reset-btn {
+      bottom: max(16px, env(safe-area-inset-bottom));
+    }
   }
 }
