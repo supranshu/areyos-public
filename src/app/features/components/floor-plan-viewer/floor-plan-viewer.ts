@@ -1,19 +1,32 @@
 import {
   Component,
-  DOCUMENT,
+  DestroyRef,
   ElementRef,
-  PLATFORM_ID,
   computed,
   effect,
   inject,
   input,
   signal,
   viewChild,
+  viewChildren,
 } from '@angular/core';
-import {Destination, RoutePoint, FloorPlanMeta, StartPoint } from '../../navigate/models/navigation.models';
+import { Destination, FloorPlanMeta, RoutePoint, StartPoint } from '../../navigate/models/navigation.models';
+
 
 const MIN_SCALE = 1;
 const MAX_SCALE = 4;
+
+// --- route animation tuning ---
+const ARROW_COUNT = 6;
+const FLOW_SPEED = 120; // viewBox units/sec that arrows travel along the route
+const MIN_DRAW_MS = 900;
+const MAX_DRAW_MS = 2200;
+const DRAW_MS_PER_UNIT = 3;
+
+function easeOutCubic(t: number): number {
+  return 1 - Math.pow(1 - t, 3);
+}
+
 @Component({
   selector: 'app-floor-plan-viewer',
   imports: [],
@@ -21,6 +34,8 @@ const MAX_SCALE = 4;
   styleUrl: './floor-plan-viewer.scss',
 })
 export class FloorPlanViewer {
+  private readonly destroyRef = inject(DestroyRef);
+
   readonly imageUrl = input<string | null>(null);
   readonly floorPlan = input<FloorPlanMeta | null>(null);
   readonly startPoint = input<StartPoint | null>(null);
@@ -30,7 +45,7 @@ export class FloorPlanViewer {
   readonly isFullscreen = signal<boolean>(false);
   private readonly stageRef = viewChild<ElementRef<HTMLDivElement>>('stage');
 
-  // --- pan/zoom state, scoped entirely to this component's canvas ---
+  // --- pan/zoom state (unchanged from before) ---
   private readonly scale = signal(1);
   private readonly translateX = signal(0);
   private readonly translateY = signal(0);
@@ -40,7 +55,6 @@ export class FloorPlanViewer {
   );
   readonly isZoomed = computed(() => this.scale() > 1);
 
-  // gesture bookkeeping — plain fields, not signals, since they're only read during a live gesture
   private readonly activePointers = new Map<number, { x: number; y: number }>();
   private pinchStartDistance = 0;
   private pinchStartScale = 1;
@@ -55,10 +69,6 @@ export class FloorPlanViewer {
     const plan = this.floorPlan();
     return plan ? `${plan.width} / ${plan.height}` : '3 / 4';
   });
-
-  readonly routePathPoints = computed(() =>
-    this.routePoints().map((p) => `${p.x},${p.y}`).join(' ')
-  );
 
   readonly startMarkerOnThisFloor = computed(() => {
     const sp = this.startPoint();
@@ -78,15 +88,109 @@ export class FloorPlanViewer {
     )
   );
 
+  // --- route draw + flow animation ---
+  readonly pathD = computed(() => {
+    const points = this.routePoints();
+    if (points.length === 0) return '';
+    return points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x},${p.y}`).join(' ');
+  });
+
+  private readonly routeLineRef = viewChild<ElementRef<SVGPathElement>>('routeLine');
+  private readonly arrowRefs = viewChildren<ElementRef<SVGGElement>>('arrowRef');
+  readonly arrowIndices = Array.from({ length: ARROW_COUNT }, (_, i) => i);
+
+  private animationFrameId: number | null = null;
+  private pathLength = 0;
+  private drawStartTime = 0;
+  private flowOffset = 0;
+  private lastFrameTime = 0;
+
   constructor() {
-    // Reset zoom whenever the floor changes or fullscreen is toggled —
-    // stale pan/zoom carrying over to a new floor/view would be confusing.
-    effect(() => {
+    // Reset zoom whenever the floor changes or fullscreen is toggled.
+    effect((onCleanup) => {
       this.floorPlan();
       this.isFullscreen();
       this.resetView();
+      onCleanup(() => {});
     });
+
+    // Restart the draw + flow animation whenever the visible route changes
+    // (new destination selected, or switching to a different floor of the route).
+    effect(() => {
+      this.pathD(); // dependency
+      // wait a frame so the viewChild ref reflects the just-updated `d` attribute
+      queueMicrotask(() => this.startRouteAnimation());
+    });
+
+    this.destroyRef.onDestroy(() => this.stopRouteAnimation());
   }
+
+  private startRouteAnimation(): void {
+    this.stopRouteAnimation();
+    const pathEl = this.routeLineRef()?.nativeElement;
+    if (!pathEl || !this.pathD()) return;
+
+    this.pathLength = pathEl.getTotalLength();
+    this.drawStartTime = performance.now();
+    this.lastFrameTime = this.drawStartTime;
+    this.flowOffset = 0;
+
+    const drawDurationMs = Math.min(
+      MAX_DRAW_MS,
+      Math.max(MIN_DRAW_MS, this.pathLength * DRAW_MS_PER_UNIT)
+    );
+
+    const tick = (now: number) => {
+      const deltaSec = (now - this.lastFrameTime) / 1000;
+      this.lastFrameTime = now;
+
+      const drawElapsed = now - this.drawStartTime;
+      const drawT = Math.min(1, drawElapsed / drawDurationMs);
+      const revealLength = easeOutCubic(drawT) * this.pathLength;
+
+      // Reveal the path by shrinking the dash-offset toward 0.
+      pathEl.style.strokeDasharray = `${this.pathLength}`;
+      pathEl.style.strokeDashoffset = `${this.pathLength - revealLength}`;
+
+      // Continuously advance the flow offset so arrows keep moving even
+      // after the line is fully drawn.
+      this.flowOffset = (this.flowOffset + FLOW_SPEED * deltaSec) % this.pathLength;
+
+      const arrows = this.arrowRefs();
+      const spacing = this.pathLength / ARROW_COUNT;
+
+      for (let i = 0; i < arrows.length; i++) {
+        const el = arrows[i].nativeElement;
+        const distance = (this.flowOffset + i * spacing) % this.pathLength;
+
+        // Hide arrows that are ahead of how far the line has drawn so far.
+        if (distance > revealLength) {
+          el.style.opacity = '0';
+          continue;
+        }
+
+        const point = pathEl.getPointAtLength(distance);
+        const ahead = pathEl.getPointAtLength(Math.min(this.pathLength, distance + 1));
+        const angleDeg = (Math.atan2(ahead.y - point.y, ahead.x - point.x) * 180) / Math.PI;
+
+        el.style.opacity = '1';
+        el.style.transform = `translate(${point.x}px, ${point.y}px) rotate(${angleDeg}deg)`;
+      }
+
+      this.animationFrameId = requestAnimationFrame(tick);
+    };
+
+    this.animationFrameId = requestAnimationFrame(tick);
+  }
+
+  private stopRouteAnimation(): void {
+    if (this.animationFrameId !== null) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
+    }
+  }
+
+  // --- fullscreen + pan/zoom methods (unchanged) ---
 
   toggleFullscreen(): void {
     this.isFullscreen.update((v) => !v);
@@ -97,8 +201,6 @@ export class FloorPlanViewer {
     this.translateX.set(0);
     this.translateY.set(0);
   }
-
-  // --- pointer gesture handling ---
 
   onPointerDown(event: PointerEvent): void {
     (event.target as HTMLElement).setPointerCapture(event.pointerId);
@@ -170,7 +272,6 @@ export class FloorPlanViewer {
     return Math.hypot(p2.x - p1.x, p2.y - p1.y);
   }
 
-  /** Zooms to newScale while keeping the content under (px, py) visually fixed. */
   private zoomAt(px: number, py: number, newScale: number): void {
     const s0 = this.scale();
     const s1 = Math.min(MAX_SCALE, Math.max(MIN_SCALE, newScale));
@@ -185,13 +286,12 @@ export class FloorPlanViewer {
   }
 
   private pan(dx: number, dy: number): void {
-    if (this.scale() <= MIN_SCALE) return; // nothing to pan when not zoomed in
+    if (this.scale() <= MIN_SCALE) return;
     this.translateX.update((x) => x + dx);
     this.translateY.update((y) => y + dy);
     this.clampTranslate();
   }
 
-  /** Keeps the content from being dragged/zoomed fully out of the visible stage. */
   private clampTranslate(): void {
     const stage = this.stageRef()?.nativeElement;
     if (!stage) return;
