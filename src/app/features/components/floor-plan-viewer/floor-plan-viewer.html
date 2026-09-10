@@ -29,11 +29,14 @@
           preserveAspectRatio="xMidYMid meet"
         >
           @if (pathD()) {
+            <path #routeEdge class="floor-plan-viewer__route-edge" [attr.d]="pathD()" fill="none" />
+            <path #routeGlow class="floor-plan-viewer__route-glow" [attr.d]="pathD()" fill="none" />
             <path #routeLine class="floor-plan-viewer__route-line" [attr.d]="pathD()" fill="none" />
 
             @for (i of arrowIndices; track i) {
               <g #arrowRef class="floor-plan-viewer__flow-arrow" style="opacity: 0">
-                <polygon points="-6,-4 6,0 -6,4" />
+                <circle class="floor-plan-viewer__arrow-halo" r="13" />
+                <polygon class="floor-plan-viewer__arrow-chevron" points="-12,-8 12,0 -12,8 -5,0" />
               </g>
             }
           }
@@ -45,6 +48,7 @@
           @if (destinationMarkerOnThisFloor(); as dest) {
             <g class="floor-plan-viewer__marker" [attr.transform]="'translate(' + dest.x + ',' + dest.y + ')'">
               <circle class="floor-plan-viewer__marker-ring floor-plan-viewer__marker-ring--destination" r="10" />
+              <circle class="floor-plan-viewer__marker-ring floor-plan-viewer__marker-ring--secondary floor-plan-viewer__marker-ring--destination" r="10" />
               <circle class="floor-plan-viewer__marker-dot floor-plan-viewer__marker-dot--destination" r="9" />
             </g>
           }
@@ -52,6 +56,7 @@
           @if (startMarkerOnThisFloor(); as start) {
             <g class="floor-plan-viewer__marker" [attr.transform]="'translate(' + start.x + ',' + start.y + ')'">
               <circle class="floor-plan-viewer__marker-ring floor-plan-viewer__marker-ring--start" r="10" />
+              <circle class="floor-plan-viewer__marker-ring floor-plan-viewer__marker-ring--secondary floor-plan-viewer__marker-ring--start" r="10" />
               <circle class="floor-plan-viewer__marker-dot floor-plan-viewer__marker-dot--start" r="9" />
             </g>
           }

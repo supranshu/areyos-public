@@ -1,280 +1,327 @@
 import { Injectable } from '@angular/core';
-import { Observable, of } from 'rxjs';
+import { Observable, of, throwError } from 'rxjs';
 import {
-  QrResolveResponse,
-  Venue,
-  StartPoint,
+  CompleteJourneyResponse,
+  CurrentJourney,
   Destination,
+  FloorPlanMeta,
+  QrResolveResponse,
   RoutePoint,
   RouteResponse,
-  FloorPlanMeta,
+  StartPoint,
+  Venue,
 } from '../../features/navigate/models/navigation.models';
 
-const toSvgDataUrl = (svg: string): string =>
+// Completely self-contained two-floor mock for local navigation demos.
+const svgData = (svg: string): string =>
   'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
 
-// These plans are deliberately map-like rather than decorative: the coordinates
-// match the destination and route nodes below, so the overlay remains useful.
-const MOCK_FLOOR_PLAN_IMAGE_URLS: Record<number, string> = {
-  1: toSvgDataUrl(`
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 760">
-      <rect width="1200" height="760" fill="#f3efe6"/>
-      <rect x="52" y="52" width="1096" height="656" rx="4" fill="#fbfaf6" stroke="#263b3a" stroke-width="10"/>
-      <path d="M70 372H1130 M450 62V372 M790 62V372 M450 372V698 M790 372V698" fill="none" stroke="#263b3a" stroke-width="8"/>
-      <path d="M70 160H450 M790 190H1130 M70 570H450 M790 560H1130" fill="none" stroke="#263b3a" stroke-width="8"/>
-      <path d="M450 250H790 M180 372V160 M980 372V190 M300 372V570 M930 372V560" fill="none" stroke="#c6bda9" stroke-width="5" stroke-dasharray="16 12"/>
-      <rect x="450" y="372" width="340" height="64" fill="#e3ded2" stroke="#263b3a" stroke-width="6"/>
-      <rect x="666" y="470" width="118" height="112" fill="#d7e1dc" stroke="#263b3a" stroke-width="6"/>
-      <path d="M702 490v72M748 490v72M682 512h86M682 540h86" fill="none" stroke="#55716c" stroke-width="4"/>
-      <path d="M162 52v-30h70v30 M925 708v30h70v-30" fill="none" stroke="#263b3a" stroke-width="10"/>
-      <g font-family="Arial, sans-serif" fill="#263b3a" text-anchor="middle">
-        <text x="600" y="32" font-size="22" font-weight="700">AREYOS VISITOR CENTRE</text>
-        <text x="195" y="110" font-size="18" font-weight="700">WELCOME HALL</text><text x="195" y="135" font-size="14">NORTH ENTRANCE</text>
-        <text x="620" y="115" font-size="18" font-weight="700">GALLERY A</text><text x="620" y="140" font-size="14">PERMANENT COLLECTION</text>
-        <text x="960" y="115" font-size="18" font-weight="700">GALLERY B</text><text x="960" y="140" font-size="14">TEMPORARY EXHIBITION</text>
-        <text x="265" y="485" font-size="18" font-weight="700">AUDITORIUM</text><text x="265" y="510" font-size="14">SEATS 120</text>
-        <text x="545" y="480" font-size="15" font-weight="700">RESTROOMS</text>
-        <text x="725" y="510" font-size="15" font-weight="700">LIFT + STAIRS</text>
-        <text x="955" y="485" font-size="18" font-weight="700">MUSEUM SHOP</text><text x="955" y="510" font-size="14">EXIT TO GARDEN</text>
-        <text x="620" y="414" font-size="15" font-weight="700">CENTRAL CONCOURSE</text>
-        <text x="960" y="735" font-size="14">SOUTH EXIT</text>
-      </g>
-      <g fill="#d3a34b" stroke="#263b3a" stroke-width="3"><circle cx="180" cy="372" r="9"/><circle cx="450" cy="372" r="9"/><circle cx="790" cy="372" r="9"/><circle cx="725" cy="526" r="9"/></g>
-    </svg>
-  `),
-  2: toSvgDataUrl(`
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 760">
-      <rect width="1200" height="760" fill="#edf1ee"/>
-      <rect x="52" y="52" width="1096" height="656" rx="4" fill="#f9fbf8" stroke="#263b3a" stroke-width="10"/>
-      <path d="M70 350H1130 M390 62V350 M820 62V350 M390 350V698 M820 350V698" fill="none" stroke="#263b3a" stroke-width="8"/>
-      <path d="M70 170H390 M820 210H1130 M70 548H390 M820 545H1130" fill="none" stroke="#263b3a" stroke-width="8"/>
-      <path d="M390 255H820 M195 350V170 M985 350V210 M250 350V548 M950 350V545" fill="none" stroke="#aebfb6" stroke-width="5" stroke-dasharray="16 12"/>
-      <rect x="390" y="350" width="430" height="64" fill="#dce7e1" stroke="#263b3a" stroke-width="6"/>
-      <rect x="666" y="470" width="118" height="112" fill="#d7e1dc" stroke="#263b3a" stroke-width="6"/>
-      <path d="M702 490v72M748 490v72M682 512h86M682 540h86" fill="none" stroke="#55716c" stroke-width="4"/>
-      <path d="M170 52v-30h70v30 M928 708v30h70v-30" fill="none" stroke="#263b3a" stroke-width="10"/>
-      <g font-family="Arial, sans-serif" fill="#263b3a" text-anchor="middle">
-        <text x="600" y="32" font-size="22" font-weight="700">AREYOS VISITOR CENTRE</text>
-        <text x="220" y="115" font-size="18" font-weight="700">LEARNING STUDIO</text><text x="220" y="140" font-size="14">WORKSHOPS + TALKS</text>
-        <text x="605" y="115" font-size="18" font-weight="700">ARCHIVE ROOM</text><text x="605" y="140" font-size="14">STAFF ACCESS</text>
-        <text x="970" y="115" font-size="18" font-weight="700">ROOFTOP CAFE</text><text x="970" y="140" font-size="14">SEATING 80</text>
-        <text x="220" y="490" font-size="18" font-weight="700">READING ROOM</text><text x="220" y="515" font-size="14">QUIET ZONE</text>
-        <text x="545" y="480" font-size="15" font-weight="700">RESTROOMS</text>
-        <text x="725" y="510" font-size="15" font-weight="700">LIFT + STAIRS</text>
-        <text x="970" y="485" font-size="18" font-weight="700">SKY TERRACE</text><text x="970" y="510" font-size="14">OPEN AIR</text>
-        <text x="605" y="392" font-size="15" font-weight="700">UPPER CONCOURSE</text>
-        <text x="963" y="735" font-size="14">TERRACE EXIT</text>
-      </g>
-      <g fill="#d3a34b" stroke="#263b3a" stroke-width="3"><circle cx="195" cy="350" r="9"/><circle cx="390" cy="350" r="9"/><circle cx="820" cy="350" r="9"/><circle cx="725" cy="526" r="9"/></g>
-    </svg>
-  `),
+const VENUE: Venue = {
+  id: 77,
+  name: 'Riverside Public Library',
+  type: 'LIBRARY',
 };
 
-const MOCK_VENUE: Venue = {
-  id: 42,
-  name: 'Areyos Visitor Centre',
-  type: 'VISITOR_CENTRE',
+const FLOORS = {
+  ground: { id: 10, name: 'Ground Floor' },
+  upper: { id: 20, name: 'Upper Floor' },
 };
 
-const MOCK_START_POINT: StartPoint = {
-  nodeId: 101,
-  name: 'North Entrance',
-  floorId: 1,
-  floorName: 'Ground Floor',
-  x: 180,
-  y: 80,
+// QR scans always resolve to a visitor-accessible entrance or lobby point.
+// Elevators are deliberately not start points; they are route waypoints only.
+const QR_LOCATIONS: Record<string, StartPoint> = {
+  'river-entrance': {
+    nodeId: 101,
+    name: 'River Entrance',
+    floorId: FLOORS.ground.id,
+    floorName: FLOORS.ground.name,
+    x: 150,
+    y: 410,
+  },
+  'town-entrance': {
+    nodeId: 102,
+    name: 'Town Entrance',
+    floorId: FLOORS.ground.id,
+    floorName: FLOORS.ground.name,
+    x: 1250,
+    y: 410,
+  },
+  'reading-lobby': {
+    nodeId: 103,
+    name: 'Reading Lobby',
+    floorId: FLOORS.ground.id,
+    floorName: FLOORS.ground.name,
+    x: 470,
+    y: 410,
+  },
 };
 
-const MOCK_DESTINATIONS: Destination[] = [
+const ELEVATOR_POINTS: Record<number, RoutePoint> = {
+  901: {
+    nodeId: 901,
+    name: 'Central Elevator - Ground Floor',
+    type: 'ELEVATOR',
+    floorId: FLOORS.ground.id,
+    floorName: FLOORS.ground.name,
+    x: 700,
+    y: 410,
+  },
+  902: {
+    nodeId: 902,
+    name: 'Central Elevator - Upper Floor',
+    type: 'ELEVATOR',
+    floorId: FLOORS.upper.id,
+    floorName: FLOORS.upper.name,
+    x: 700,
+    y: 410,
+  },
+};
+
+const DESTINATIONS: Destination[] = [
   {
     nodeId: 201,
-    name: 'Information Desk',
+    name: 'Children\'s Corner',
     type: 'DESTINATION',
-    floorId: 1,
-    floorName: 'Ground Floor',
-    x: 420,
-    y: 300,
+    floorId: FLOORS.ground.id,
+    floorName: FLOORS.ground.name,
+    x: 250,
+    y: 170,
   },
   {
     nodeId: 202,
-    name: 'Gallery A',
+    name: 'Cafe Reading Room',
     type: 'DESTINATION',
-    floorId: 1,
-    floorName: 'Ground Floor',
-    x: 620,
-    y: 200,
-  },
-  {
-    nodeId: 203,
-    name: 'Gallery B',
-    type: 'DESTINATION',
-    floorId: 1,
-    floorName: 'Ground Floor',
-    x: 960,
-    y: 200,
-  },
-  {
-    nodeId: 204,
-    name: 'Auditorium',
-    type: 'DESTINATION',
-    floorId: 1,
-    floorName: 'Ground Floor',
-    x: 265,
-    y: 530,
-  },
-  {
-    nodeId: 205,
-    name: 'Museum Shop',
-    type: 'DESTINATION',
-    floorId: 1,
-    floorName: 'Ground Floor',
-    x: 955,
-    y: 530,
+    floorId: FLOORS.ground.id,
+    floorName: FLOORS.ground.name,
+    x: 1150,
+    y: 170,
   },
   {
     nodeId: 301,
-    name: 'Learning Studio',
+    name: 'Local History Archive',
     type: 'DESTINATION',
-    floorId: 2,
-    floorName: 'First Floor',
-    x: 220,
-    y: 200,
+    floorId: FLOORS.upper.id,
+    floorName: FLOORS.upper.name,
+    x: 250,
+    y: 170,
   },
   {
     nodeId: 302,
-    name: 'Rooftop Cafe',
+    name: 'Study Hall',
     type: 'DESTINATION',
-    floorId: 2,
-    floorName: 'First Floor',
-    x: 970,
-    y: 200,
-  },
-  {
-    nodeId: 303,
-    name: 'Reading Room',
-    type: 'DESTINATION',
-    floorId: 2,
-    floorName: 'First Floor',
-    x: 220,
-    y: 530,
-  },
-  {
-    nodeId: 304,
-    name: 'Sky Terrace',
-    type: 'DESTINATION',
-    floorId: 2,
-    floorName: 'First Floor',
-    x: 970,
-    y: 530,
+    floorId: FLOORS.upper.id,
+    floorName: FLOORS.upper.name,
+    x: 1150,
+    y: 170,
   },
 ];
 
-const MOCK_FLOOR_PLANS: FloorPlanMeta[] = [
+const FLOOR_PLANS: FloorPlanMeta[] = [
   {
-    floorId: 1,
-    floorName: 'Ground Floor',
+    floorId: FLOORS.ground.id,
+    floorName: FLOORS.ground.name,
     floorNumber: 0,
-    storageKey: 'mock-ground-floor',
-    fileName: 'ground-floor.svg',
+    storageKey: 'riverside-library/ground-floor',
+    fileName: 'library-ground-floor.svg',
     mimeType: 'image/svg+xml',
-    width: 1200,
-    height: 760,
+    width: 1400,
+    height: 820,
   },
   {
-    floorId: 2,
-    floorName: 'First Floor',
+    floorId: FLOORS.upper.id,
+    floorName: FLOORS.upper.name,
     floorNumber: 1,
-    storageKey: 'mock-first-floor',
-    fileName: 'first-floor.svg',
+    storageKey: 'riverside-library/upper-floor',
+    fileName: 'library-upper-floor.svg',
     mimeType: 'image/svg+xml',
-    width: 1200,
-    height: 760,
+    width: 1400,
+    height: 820,
   },
 ];
+
+const FLOOR_PLAN_IMAGES: Record<number, string> = {
+  10: svgData(`
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 820">
+      <rect width="1400" height="820" fill="#f5efe4"/>
+      <rect x="40" y="40" width="1320" height="740" fill="#fffdf8" stroke="#5b4636" stroke-width="12"/>
+      <path d="M60 410H1340M470 55V410M930 55V410M470 410V765M930 410V765" fill="none" stroke="#5b4636" stroke-width="10"/>
+      <rect x="610" y="330" width="180" height="160" fill="#eadfc9" stroke="#5b4636" stroke-width="8"/>
+      <g fill="#5b4636" font-family="Arial,sans-serif" text-anchor="middle">
+        <text x="700" y="28" font-size="24" font-weight="700">GROUND FLOOR</text>
+        <text x="250" y="145" font-size="22" font-weight="700">CHILDREN'S CORNER</text>
+        <text x="1150" y="145" font-size="22" font-weight="700">CAFE READING ROOM</text>
+        <text x="700" y="535" font-size="18" font-weight="700">CENTRAL ELEVATOR</text>
+        <text x="250" y="600" font-size="18">NEW BOOKS</text>
+        <text x="1150" y="600" font-size="18">INFORMATION DESK</text>
+      </g>
+      <g fill="#d18b42" stroke="#5b4636" stroke-width="4"><circle cx="150" cy="410" r="13"/><circle cx="1250" cy="410" r="13"/><circle cx="470" cy="410" r="13"/><circle cx="700" cy="410" r="13"/></g>
+    </svg>
+  `),
+  20: svgData(`
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 820">
+      <rect width="1400" height="820" fill="#e9f0f2"/>
+      <rect x="40" y="40" width="1320" height="740" fill="#fbffff" stroke="#315b63" stroke-width="12"/>
+      <path d="M60 410H1340M470 55V410M930 55V410M470 410V765M930 410V765" fill="none" stroke="#315b63" stroke-width="10"/>
+      <rect x="610" y="330" width="180" height="160" fill="#d8e8ea" stroke="#315b63" stroke-width="8"/>
+      <g fill="#315b63" font-family="Arial,sans-serif" text-anchor="middle">
+        <text x="700" y="28" font-size="24" font-weight="700">UPPER FLOOR</text>
+        <text x="250" y="145" font-size="22" font-weight="700">LOCAL HISTORY</text>
+        <text x="1150" y="145" font-size="22" font-weight="700">STUDY HALL</text>
+        <text x="700" y="535" font-size="18" font-weight="700">CENTRAL ELEVATOR</text>
+        <text x="250" y="600" font-size="18">QUIET TABLES</text>
+        <text x="1150" y="600" font-size="18">DIGITAL ARCHIVE</text>
+      </g>
+      <g fill="#d18b42" stroke="#315b63" stroke-width="4"><circle cx="700" cy="410" r="13"/><circle cx="250" cy="170" r="13"/><circle cx="1150" cy="170" r="13"/></g>
+    </svg>
+  `),
+};
+
+interface MockSession {
+  sessionId: string;
+  currentPoint: StartPoint;
+  destinationNodeId: number | null;
+  status: 'ACTIVE' | 'COMPLETED';
+}
+
+const sessions = new Map<string, MockSession>();
+let nextSessionId = 1;
 
 @Injectable({ providedIn: 'root' })
 export class VisitorApiService {
-  resolveQrCode(code: string): Observable<QrResolveResponse> {
-    return of({ venue: MOCK_VENUE, startPoint: MOCK_START_POINT });
+  resolveQrCode(code: string, sessionId?: string | null): Observable<QrResolveResponse> {
+    const point = QR_LOCATIONS[code] ?? QR_LOCATIONS['river-entrance'];
+    const session = sessions.get(sessionId ?? '') ?? this.createSession(point);
+    session.currentPoint = point;
+    session.status = 'ACTIVE';
+
+    return of({
+      sessionId: session.sessionId,
+      hasActiveJourney: session.destinationNodeId !== null,
+      venue: VENUE,
+      startPoint: point,
+      activeJourney: this.getJourney(session),
+    });
   }
 
   getDestinations(venueId: number): Observable<Destination[]> {
-    return of(MOCK_DESTINATIONS);
+    return venueId === VENUE.id
+      ? of(DESTINATIONS)
+      : throwError(() => new Error('Venue not found'));
   }
 
-  calculateRoute(venueId: number, fromNodeId: number, toNodeId: number): Observable<RouteResponse> {
-    const destination = MOCK_DESTINATIONS.find((item) => item.nodeId === toNodeId) ?? MOCK_DESTINATIONS[0];
-    const points: RoutePoint[] = [
-      { ...MOCK_START_POINT, type: 'JUNCTION' },
-      {
-        nodeId: 401,
-        name: 'Welcome Hall Junction',
-        type: 'JUNCTION',
-        floorId: 1,
-        floorName: 'Ground Floor',
-        x: 180,
-        y: 372,
-      },
-    ];
+  calculateRoute(sessionId: string, destinationNodeId: number): Observable<RouteResponse> {
+    const session = sessions.get(sessionId);
+    const destination = DESTINATIONS.find((item) => item.nodeId === destinationNodeId);
+    if (!session || !destination) return throwError(() => new Error('Route cannot be calculated'));
 
-    if (destination.floorId === 1) {
-      points.push({
-        nodeId: 402,
-        name: 'Central Concourse',
-        type: 'JUNCTION',
-        floorId: 1,
-        floorName: 'Ground Floor',
-        x: 620,
-        y: 372,
-      });
-    } else {
-      points.push({
-        nodeId: 403,
-        name: 'Lift and Stair Core',
-        type: 'ELEVATOR',
-        floorId: 1,
-        floorName: 'Ground Floor',
-        x: 725,
-        y: 526,
-      });
-      points.push({
-        nodeId: 404,
-        name: 'Lift and Stair Core',
-        type: 'ELEVATOR',
-        floorId: 2,
-        floorName: 'First Floor',
-        x: 725,
-        y: 526,
-      });
-      points.push({
-        nodeId: 405,
-        name: 'Upper Concourse',
-        type: 'JUNCTION',
-        floorId: 2,
-        floorName: 'First Floor',
-        x: 605,
-        y: 350,
-      });
+    session.destinationNodeId = destinationNodeId;
+    return of(this.buildRoute(session.currentPoint, destination));
+  }
+
+  getCurrentJourney(sessionId: string): Observable<CurrentJourney> {
+    const session = sessions.get(sessionId);
+    const journey = session ? this.getJourney(session) : null;
+    return journey ? of(journey) : throwError(() => new Error('Journey not found'));
+  }
+
+  updateLocation(sessionId: string, nodeId: number): Observable<RouteResponse> {
+    const session = sessions.get(sessionId);
+    const point = QR_LOCATIONS[nodeId];
+    const destination = session?.destinationNodeId
+      ? DESTINATIONS.find((item) => item.nodeId === session.destinationNodeId)
+      : null;
+
+    if (!session || !point || !destination) {
+      return throwError(() => new Error('Active journey not found'));
     }
 
-    points.push(destination);
+    session.currentPoint = point;
+    return of(this.buildRoute(point, destination));
+  }
 
+  completeJourney(sessionId: string): Observable<CompleteJourneyResponse> {
+    const session = sessions.get(sessionId);
+    if (!session) return throwError(() => new Error('Session not found'));
+
+    session.status = 'COMPLETED';
+    session.destinationNodeId = null;
     return of({
-      venueId,
-      fromNodeId,
-      toNodeId: destination.nodeId,
-      totalDistance: destination.floorId === MOCK_START_POINT.floorId ? 150 : 260,
-      estimatedTimeMinutes: destination.floorId === MOCK_START_POINT.floorId ? 3 : 5,
-      points,
+      sessionId,
+      status: 'COMPLETED',
+      venueId: VENUE.id,
+      venueName: VENUE.name,
+      resumable: false,
     });
   }
 
   getFloorPlanMeta(floorId: number): Observable<FloorPlanMeta> {
-    return of(MOCK_FLOOR_PLANS.find((plan) => plan.floorId === floorId) ?? MOCK_FLOOR_PLANS[0]);
+    const plan = FLOOR_PLANS.find((item) => item.floorId === floorId);
+    return plan ? of(plan) : throwError(() => new Error('Floor plan not found'));
   }
 
-  /** Used directly as an <img [src]> — no need to route binary bytes through HttpClient. */
   getFloorPlanImageUrl(floorId: number): string {
-    return MOCK_FLOOR_PLAN_IMAGE_URLS[floorId] ?? MOCK_FLOOR_PLAN_IMAGE_URLS[1];
+    return FLOOR_PLAN_IMAGES[floorId] ?? FLOOR_PLAN_IMAGES[FLOORS.ground.id];
+  }
+
+  private createSession(currentPoint: StartPoint): MockSession {
+    const session: MockSession = {
+      sessionId: `library-session-${String(nextSessionId++).padStart(3, '0')}`,
+      currentPoint,
+      destinationNodeId: null,
+      status: 'ACTIVE',
+    };
+    sessions.set(session.sessionId, session);
+    return session;
+  }
+
+  private getJourney(session: MockSession): CurrentJourney | null {
+    const destination = DESTINATIONS.find((item) => item.nodeId === session.destinationNodeId);
+    return destination
+      ? {
+          sessionId: session.sessionId,
+          status: session.status,
+          venueId: VENUE.id,
+          venueName: VENUE.name,
+          currentPoint: session.currentPoint,
+          destination: {
+            nodeId: destination.nodeId,
+            name: destination.name,
+            floorId: destination.floorId,
+            floorName: destination.floorName,
+          },
+          resumable: session.status === 'ACTIVE',
+        }
+      : null;
+  }
+
+  private buildRoute(from: StartPoint, destination: Destination): RouteResponse {
+    const points: RoutePoint[] = [{ ...from, type: 'JUNCTION' }];
+
+    if (from.floorId !== destination.floorId) {
+      points.push({
+        nodeId: ELEVATOR_POINTS[901].nodeId,
+        name: ELEVATOR_POINTS[901].name,
+        type: 'ELEVATOR',
+        floorId: from.floorId,
+        floorName: from.floorName,
+        x: 700,
+        y: 410,
+      });
+      points.push({
+        ...ELEVATOR_POINTS[902],
+        floorId: destination.floorId,
+        floorName: destination.floorName,
+      });
+    }
+
+    points.push(destination);
+    return {
+      venueId: VENUE.id,
+      fromNodeId: from.nodeId,
+      toNodeId: destination.nodeId,
+      totalDistance: from.floorId === destination.floorId ? 260 : 480,
+      estimatedTimeMinutes: from.floorId === destination.floorId ? 4 : 8,
+      points,
+    };
   }
 }

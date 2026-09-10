@@ -1,12 +1,20 @@
 .floor-switcher {
   display: flex;
   gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
 
   &__tab {
-    flex: 1;
-    padding: 8px 0;
+    flex: 0 0 auto;
+    min-width: 72px;
+    min-height: 44px;
+    padding: 8px 14px;
     border: 1px solid var(--hairline);
-    background: var(--paper);
+    background: var(--surface-soft);
     border-radius: 8px;
     font-size: 0.85rem;
     color: var(--body-gray);
@@ -14,8 +22,9 @@
 
     &--active {
       border-color: var(--brand-blue);
-      color: var(--brand-blue);
-      font-weight: 500;
+      background: var(--brand-blue);
+      color: var(--paper-tint);
+      font-weight: 600;
     }
   }
 }

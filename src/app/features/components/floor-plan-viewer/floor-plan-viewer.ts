@@ -2,6 +2,7 @@ import {
   Component,
   DestroyRef,
   ElementRef,
+  NgZone,
   computed,
   effect,
   inject,
@@ -17,8 +18,8 @@ const MIN_SCALE = 1;
 const MAX_SCALE = 4;
 
 // --- route animation tuning ---
-const ARROW_COUNT = 6;
-const FLOW_SPEED = 120; // viewBox units/sec that arrows travel along the route
+const ARROW_COUNT = 5;
+const FLOW_SPEED = 105; // viewBox units/sec that arrows travel along the route
 const MIN_DRAW_MS = 900;
 const MAX_DRAW_MS = 2200;
 const DRAW_MS_PER_UNIT = 3;
@@ -35,6 +36,7 @@ function easeOutCubic(t: number): number {
 })
 export class FloorPlanViewer {
   private readonly destroyRef = inject(DestroyRef);
+  private readonly ngZone = inject(NgZone);
 
   readonly imageUrl = input<string | null>(null);
   readonly floorPlan = input<FloorPlanMeta | null>(null);
@@ -96,6 +98,8 @@ export class FloorPlanViewer {
   });
 
   private readonly routeLineRef = viewChild<ElementRef<SVGPathElement>>('routeLine');
+  private readonly routeEdgeRef = viewChild<ElementRef<SVGPathElement>>('routeEdge');
+  private readonly routeGlowRef = viewChild<ElementRef<SVGPathElement>>('routeGlow');
   private readonly arrowRefs = viewChildren<ElementRef<SVGGElement>>('arrowRef');
   readonly arrowIndices = Array.from({ length: ARROW_COUNT }, (_, i) => i);
 
@@ -128,7 +132,9 @@ export class FloorPlanViewer {
   private startRouteAnimation(): void {
     this.stopRouteAnimation();
     const pathEl = this.routeLineRef()?.nativeElement;
-    if (!pathEl || !this.pathD()) return;
+    const edgeEl = this.routeEdgeRef()?.nativeElement;
+    const glowEl = this.routeGlowRef()?.nativeElement;
+    if (!pathEl || !edgeEl || !glowEl || !this.pathD()) return;
 
     this.pathLength = pathEl.getTotalLength();
     this.drawStartTime = performance.now();
@@ -151,6 +157,10 @@ export class FloorPlanViewer {
       // Reveal the path by shrinking the dash-offset toward 0.
       pathEl.style.strokeDasharray = `${this.pathLength}`;
       pathEl.style.strokeDashoffset = `${this.pathLength - revealLength}`;
+      edgeEl.style.strokeDasharray = `${this.pathLength}`;
+      edgeEl.style.strokeDashoffset = `${this.pathLength - revealLength}`;
+      glowEl.style.strokeDasharray = `${this.pathLength}`;
+      glowEl.style.strokeDashoffset = `${this.pathLength - revealLength}`;
 
       // Continuously advance the flow offset so arrows keep moving even
       // after the line is fully drawn.
@@ -173,8 +183,13 @@ export class FloorPlanViewer {
         const ahead = pathEl.getPointAtLength(Math.min(this.pathLength, distance + 1));
         const angleDeg = (Math.atan2(ahead.y - point.y, ahead.x - point.x) * 180) / Math.PI;
 
-        el.style.opacity = '1';
-        el.style.transform = `translate(${point.x}px, ${point.y}px) rotate(${angleDeg}deg)`;
+        const pulse = 0.5 + 0.5 * Math.sin((now / 240) + i * 0.9);
+        const headFade = Math.min(1, (revealLength - distance) / 60);
+        const opacity = (0.72 + pulse * 0.28) * headFade;
+        const scale = 0.9 + pulse * 0.18;
+
+        el.style.opacity = `${opacity}`;
+        el.style.transform = `translate(${point.x}px, ${point.y}px) rotate(${angleDeg}deg) scale(${scale})`;
       }
 
       this.animationFrameId = requestAnimationFrame(tick);

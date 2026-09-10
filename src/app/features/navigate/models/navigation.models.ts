@@ -16,8 +16,36 @@ export interface StartPoint {
 }
 
 export interface QrResolveResponse {
+  sessionId: string;
+  hasActiveJourney: boolean;
   venue: Venue;
   startPoint: StartPoint;
+  activeJourney: CurrentJourney | null;
+}
+
+export interface JourneyDestination {
+  nodeId: number;
+  name: string;
+  floorId: number;
+  floorName: string;
+}
+
+export interface CurrentJourney {
+  sessionId: string;
+  status: 'ACTIVE' | 'COMPLETED' | string;
+  venueId: number;
+  venueName: string;
+  currentPoint: StartPoint;
+  destination: JourneyDestination | null;
+  resumable: boolean;
+}
+
+export interface CompleteJourneyResponse {
+  sessionId: string;
+  status: 'COMPLETED' | string;
+  venueId: number;
+  venueName: string;
+  resumable: boolean;
 }
 
 export interface Destination {

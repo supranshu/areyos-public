@@ -11,4 +11,5 @@ import { RouteResponse } from '../../navigate/models/navigation.models';
 export class RouteSummary {
   readonly route = input.required<RouteResponse>();
   readonly clear = output<void>();
+  readonly complete = output<void>();
 }

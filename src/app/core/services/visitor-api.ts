@@ -1,11 +1,13 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import {
   QrResolveResponse,
   Destination,
   RouteResponse,
   FloorPlanMeta,
+  CurrentJourney,
+  CompleteJourneyResponse,
 } from '../../features/navigate/models/navigation.models';
 import { environment } from '../../../environment/environment.prod';
 
@@ -14,21 +16,37 @@ export class VisitorApiService {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = environment.visitorApiBaseUrl;
 
-  resolveQrCode(code: string): Observable<QrResolveResponse> {
-    return this.http.get<QrResolveResponse>(`${this.baseUrl}/qr/${encodeURIComponent(code)}`);
+  resolveQrCode(code: string, sessionId?: string | null): Observable<QrResolveResponse> {
+    return this.http.get<QrResolveResponse>(`${this.baseUrl}/qr/${encodeURIComponent(code)}`, {
+      headers: this.sessionHeaders(sessionId),
+    });
   }
 
   getDestinations(venueId: number): Observable<Destination[]> {
     return this.http.get<Destination[]>(`${this.baseUrl}/venues/${venueId}/destinations`);
   }
 
-  calculateRoute(venueId: number, fromNodeId: number, toNodeId: number): Observable<RouteResponse> {
-    const params = {
-      venueId: String(venueId),
-      fromNodeId: String(fromNodeId),
-      toNodeId: String(toNodeId),
-    };
-    return this.http.get<RouteResponse>(`${this.baseUrl}/routes`, { params });
+  calculateRoute(sessionId: string, destinationNodeId: number): Observable<RouteResponse> {
+    return this.http.post<RouteResponse>(`${this.baseUrl}/sessions/${sessionId}/route`, {
+      destinationNodeId,
+    });
+  }
+
+  getCurrentJourney(sessionId: string): Observable<CurrentJourney> {
+    return this.http.get<CurrentJourney>(`${this.baseUrl}/sessions/${sessionId}`);
+  }
+
+  updateLocation(sessionId: string, nodeId: number): Observable<RouteResponse> {
+    return this.http.post<RouteResponse>(`${this.baseUrl}/sessions/${sessionId}/location`, {
+      nodeId,
+    });
+  }
+
+  completeJourney(sessionId: string): Observable<CompleteJourneyResponse> {
+    return this.http.post<CompleteJourneyResponse>(
+      `${this.baseUrl}/sessions/${sessionId}/complete`,
+      null
+    );
   }
 
   getFloorPlanMeta(floorId: number): Observable<FloorPlanMeta> {
@@ -38,5 +56,9 @@ export class VisitorApiService {
   /** Used directly as an <img [src]> — no need to route binary bytes through HttpClient. */
   getFloorPlanImageUrl(floorId: number): string {
     return `${this.baseUrl}/floors/${floorId}/floor-plan/image`;
+  }
+
+  private sessionHeaders(sessionId?: string | null): HttpHeaders {
+    return sessionId ? new HttpHeaders({ 'X-Session-Id': sessionId }) : new HttpHeaders();
   }
 }

@@ -1,0 +1,30 @@
+.app__theme-toggle {
+	position: fixed;
+	bottom: max(14px, env(safe-area-inset-top));
+	right: max(14px, env(safe-area-inset-left));
+	z-index: 1100;
+	width: 42px;
+	height: 42px;
+	display: grid;
+	place-items: center;
+	border: 1px solid var(--hairline);
+	border-radius: 50%;
+	background: var(--surface-raised);
+	color: var(--ink);
+	box-shadow: 0 8px 20px var(--shadow);
+	cursor: pointer;
+	transition: transform 180ms ease, background 180ms ease, color 180ms ease;
+
+	&:hover { transform: translateY(-2px); }
+	&:active { transform: scale(0.94); }
+
+	svg {
+		width: 20px;
+		height: 20px;
+		fill: none;
+		stroke: currentColor;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+		stroke-width: 1.8;
+	}
+}

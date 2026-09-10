@@ -16,9 +16,12 @@
   &__stage {
     position: relative;
     width: 100%;
-    border-radius: 12px;
+    min-height: 340px;
+    border: 1px solid var(--hairline);
+    border-radius: 20px;
     overflow: hidden;
-    background: var(--paper-tint);
+    background: var(--surface-raised);
+    box-shadow: 0 14px 32px var(--shadow);
     // Blocks the browser's native pinch-zoom/pan on this element specifically —
     // this is what stops the whole page from zooming during a gesture here.
     touch-action: none;
@@ -59,12 +62,49 @@
     stroke-width: 6;
     stroke-linecap: round;
     stroke-linejoin: round;
+    filter: drop-shadow(0 1px 1px rgba(10, 10, 10, 0.18));
     // dasharray/dashoffset are set directly via JS each frame during the draw animation
   }
 
+  &__route-edge {
+    stroke: var(--paper);
+    stroke-width: 12;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    opacity: 0.9;
+    // Creates a crisp contrast boundary between the route and the floor plan.
+  }
+
+  &__route-glow {
+    stroke: var(--brand-blue);
+    stroke-width: 16;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    opacity: 0.22;
+    filter: blur(5px);
+    // The glow uses the same dash values as the main route, set by JS.
+  }
+
   &__flow-arrow {
+    paint-order: stroke;
+    transform-box: fill-box;
+    transform-origin: center;
+    filter: drop-shadow(0 2px 3px rgba(10, 10, 10, 0.42));
+    // Opacity, position, rotation, and scale are updated per frame.
+  }
+
+  &__arrow-halo {
+    fill: var(--paper);
+    stroke: var(--brand-blue);
+    stroke-width: 2;
+    opacity: 0.96;
+  }
+
+  &__arrow-chevron {
     fill: var(--brand-blue);
-    // opacity is toggled by JS per-frame; transform is set by JS to move + rotate
+    stroke: var(--paper);
+    stroke-width: 2;
+    stroke-linejoin: round;
   }
   &__marker {
     // transform-box lets percentage/center-based CSS transforms work correctly on
@@ -78,7 +118,7 @@
     stroke-width: 3;
     transform-box: fill-box;
     transform-origin: center;
-    animation: heartbeat-ring 1.8s ease-out infinite;
+    animation: heartbeat-ring 2.8s cubic-bezier(0.2, 0.7, 0.3, 1) infinite;
 
     &--start {
       stroke: var(--brand-blue);
@@ -86,6 +126,11 @@
 
     &--destination {
       stroke: #1a9c5f;
+    }
+
+    &--secondary {
+      animation-delay: 1.35s;
+      opacity: 0;
     }
   }
 
@@ -95,7 +140,7 @@
     stroke-width: 3;
     transform-box: fill-box;
     transform-origin: center;
-    animation: heartbeat-dot 1.8s ease-in-out infinite;
+    animation: heartbeat-dot 2.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 
     &--start {
       fill: var(--brand-blue);
@@ -112,18 +157,6 @@
     stroke-width: 2;
   }
 
-  &__start-marker {
-    fill: var(--brand-blue);
-    stroke: var(--paper);
-    stroke-width: 3;
-  }
-
-  &__destination-marker {
-    fill: #1a9c5f;
-    stroke: var(--paper);
-    stroke-width: 3;
-  }
-
   &__floor-label {
     font-size: var(--fs-label);
     color: var(--slate);
@@ -135,12 +168,12 @@
     position: absolute;
     top: 12px;
     right: 12px;
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--paper);
+    background: var(--surface-raised);
     color: var(--ink);
     border: none;
     border-radius: 50%;
@@ -158,7 +191,7 @@
     bottom: 16px;
     left: 50%;
     transform: translateX(-50%);
-    background: var(--paper);
+    background: var(--surface-raised);
     color: var(--ink);
     border: none;
     border-radius: 999px;
@@ -196,18 +229,15 @@
 }
 
 @keyframes heartbeat-ring {
-  0% { transform: scale(1); opacity: 0.6; }
-  25% { transform: scale(1.9); opacity: 0; }
-  50% { transform: scale(1); opacity: 0; }
-  60% { transform: scale(1.5); opacity: 0.4; }
-  85% { transform: scale(2.3); opacity: 0; }
-  100% { transform: scale(1); opacity: 0; }
+  0% { transform: scale(1); opacity: 0.72; }
+  58% { transform: scale(2.25); opacity: 0; }
+  100% { transform: scale(2.25); opacity: 0; }
 }
 
 @keyframes heartbeat-dot {
   0%, 100% { transform: scale(1); }
-  15% { transform: scale(1.25); }
-  30% { transform: scale(1); }
-  55% { transform: scale(1.15); }
-  70% { transform: scale(1); }
+  8% { transform: scale(1.2); }
+  18% { transform: scale(1); }
+  28% { transform: scale(1.08); }
+  38% { transform: scale(1); }
 }

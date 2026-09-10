@@ -3,13 +3,14 @@
   flex-direction: column;
   gap: 12px;
   padding: 16px;
-  background: var(--paper);
+  background: var(--surface-soft);
   border: 1px solid var(--hairline);
   border-radius: 12px;
 
   &__stat {
     display: flex;
     flex-direction: column;
+    flex: 1;
   }
 
   &__value {
@@ -28,13 +29,25 @@
     background: none;
     border: 1px solid var(--hairline);
     border-radius: 8px;
-    padding: 10px 0;
+    min-height: 44px;
+    padding: 10px 12px;
     font-size: var(--fs-label);
     color: var(--brand-blue);
     cursor: pointer;
 
     &:hover {
       background: var(--paper-tint);
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .route-summary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+
+    &__clear-btn {
+      grid-column: 1 / -1;
     }
   }
 }

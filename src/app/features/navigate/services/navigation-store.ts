@@ -7,6 +7,7 @@ import {
   Destination,
   RouteResponse,
   FloorPlanMeta,
+  CurrentJourney,
 } from '../models/navigation.models';
 
 export type NavigationPhase =
@@ -23,6 +24,7 @@ export type NavigationPhase =
 @Injectable()
 export class NavigationStore {
   private readonly api = inject(VisitorApiService);
+  private readonly sessionStorageKey = 'areyos.sessionId';
   private lastCode: string | null = null;
 
   private readonly _phase = signal<NavigationPhase>('idle');
@@ -32,6 +34,8 @@ export class NavigationStore {
   private readonly _destinations = signal<Destination[]>([]);
   private readonly _selectedDestination = signal<Destination | null>(null);
   private readonly _route = signal<RouteResponse | null>(null);
+  private readonly _journey = signal<CurrentJourney | null>(null);
+  private readonly _sessionId = signal<string | null>(this.readSessionId());
   private readonly _floorPlans = signal<Map<number, FloorPlanMeta>>(new Map());
   private readonly _activeFloorId = signal<number | null>(null);
 
@@ -42,6 +46,8 @@ export class NavigationStore {
   readonly destinations = this._destinations.asReadonly();
   readonly selectedDestination = this._selectedDestination.asReadonly();
   readonly route = this._route.asReadonly();
+  readonly journey = this._journey.asReadonly();
+  readonly sessionId = this._sessionId.asReadonly();
   readonly activeFloorId = this._activeFloorId.asReadonly();
 
   readonly activeFloorPlan = computed(() => {
@@ -84,12 +90,18 @@ export class NavigationStore {
     this._phase.set('resolving-qr');
     this._errorMessage.set(null);
 
-    this.api.resolveQrCode(code).subscribe({
+    this.api.resolveQrCode(code, this._sessionId()).subscribe({
       next: (res) => {
+        this.setSessionId(res.sessionId);
+        this._journey.set(res.activeJourney);
         this._venue.set(res.venue);
         this._startPoint.set(res.startPoint);
         this._activeFloorId.set(res.startPoint.floorId);
-        this.loadVenueData(res.venue.id, res.startPoint.floorId);
+        this.loadVenueData(
+          res.venue.id,
+          res.startPoint.floorId,
+          res.hasActiveJourney ? res.activeJourney?.destination?.nodeId ?? null : null
+        );
       },
       error: () => this.fail('This QR code could not be recognized. Please rescan and try again.'),
     });
@@ -100,27 +112,44 @@ export class NavigationStore {
   }
 
   selectDestination(destination: Destination): void {
-    const startPoint = this._startPoint();
-    const venue = this._venue();
-    if (!startPoint || !venue) return;
+    const sessionId = this._sessionId();
+    if (!sessionId) return;
 
     this._selectedDestination.set(destination);
     this._phase.set('calculating-route');
     this._route.set(null);
 
-    this.api.calculateRoute(venue.id, startPoint.nodeId, destination.nodeId).subscribe({
+    this.api.calculateRoute(sessionId, destination.nodeId).subscribe({
       next: (route) => {
-        this._route.set(route);
-        const floorIds = [...new Set(route.points.map((p) => p.floorId))];
-        forkJoin(floorIds.map((id) => this.ensureFloorPlanLoaded(id))).subscribe({
-          next: () => {
-            this._activeFloorId.set(startPoint.floorId);
-            this._phase.set('route-ready');
-          },
-          error: () => this.fail('Could not load floor plans for this route.'),
-        });
+        this.applyRoute(route);
       },
       error: () => this.fail('Could not calculate a route to this destination.'),
+    });
+  }
+
+  refreshJourney(): void {
+    const sessionId = this._sessionId();
+    if (!sessionId) return;
+
+    this.api.getCurrentJourney(sessionId).subscribe({
+      next: (journey) => this._journey.set(journey),
+      error: () => this._journey.set(null),
+    });
+  }
+
+  completeJourney(): void {
+    const sessionId = this._sessionId();
+    if (!sessionId) return;
+
+    this.api.completeJourney(sessionId).subscribe({
+      next: () => {
+        this.clearSessionId();
+        this._journey.set(null);
+        this._selectedDestination.set(null);
+        this._route.set(null);
+        this._phase.set('ready');
+      },
+      error: () => this.fail('Could not complete this journey.'),
     });
   }
 
@@ -143,7 +172,7 @@ export class NavigationStore {
     return this.api.getFloorPlanImageUrl(floorId);
   }
 
-  private loadVenueData(venueId: number, floorId: number): void {
+  private loadVenueData(venueId: number, floorId: number, resumeDestinationNodeId: number | null = null): void {
     this._phase.set('loading-venue-data');
 
     forkJoin({
@@ -152,7 +181,17 @@ export class NavigationStore {
     }).subscribe({
       next: ({ destinations }) => {
         this._destinations.set(destinations);
-        this._phase.set('ready');
+        const resumeDestination = destinations.find((item) => item.nodeId === resumeDestinationNodeId);
+        if (resumeDestination && this._sessionId()) {
+          this._selectedDestination.set(resumeDestination);
+          this._phase.set('calculating-route');
+          this.api.updateLocation(this._sessionId()!, this._startPoint()!.nodeId).subscribe({
+            next: (route) => this.applyRoute(route),
+            error: () => this.fail('Could not update your location.'),
+          });
+        } else {
+          this._phase.set('ready');
+        }
       },
       error: () => this.fail('Could not load venue data. Please try again.'),
     });
@@ -174,5 +213,43 @@ export class NavigationStore {
   private fail(message: string): void {
     this._errorMessage.set(message);
     this._phase.set('error');
+  }
+
+  private applyRoute(route: RouteResponse): void {
+    this._route.set(route);
+    const currentPoint = route.points[0];
+    if (currentPoint) {
+      this._startPoint.set({
+        nodeId: currentPoint.nodeId,
+        name: currentPoint.name,
+        floorId: currentPoint.floorId,
+        floorName: currentPoint.floorName,
+        x: currentPoint.x,
+        y: currentPoint.y,
+      });
+    }
+    const floorIds = [...new Set(route.points.map((p) => p.floorId))];
+    forkJoin(floorIds.map((id) => this.ensureFloorPlanLoaded(id))).subscribe({
+      next: () => {
+        const startPoint = this._startPoint();
+        if (startPoint) this._activeFloorId.set(startPoint.floorId);
+        this._phase.set('route-ready');
+      },
+      error: () => this.fail('Could not load floor plans for this route.'),
+    });
+  }
+
+  private readSessionId(): string | null {
+    return typeof sessionStorage === 'undefined' ? null : sessionStorage.getItem(this.sessionStorageKey);
+  }
+
+  private setSessionId(sessionId: string): void {
+    this._sessionId.set(sessionId);
+    if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(this.sessionStorageKey, sessionId);
+  }
+
+  private clearSessionId(): void {
+    this._sessionId.set(null);
+    if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem(this.sessionStorageKey);
   }
 }

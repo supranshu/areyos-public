@@ -3,6 +3,7 @@
   background: var(--paper-tint);
   display: flex;
   flex-direction: column;
+  background-image: radial-gradient(circle at 15% 0%, var(--surface-soft) 0, transparent 30%);
 
   &__state {
     flex: 1;
@@ -33,14 +34,19 @@
   &__body {
     display: flex;
     flex-direction: column;
-    gap: 16px;
-    padding: 16px;
+    gap: 14px;
+    padding: 12px 12px calc(20px + env(safe-area-inset-bottom));
   }
 
   &__panel {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 12px;
+    padding: 16px;
+    background: var(--surface-raised);
+    border: 1px solid var(--hairline);
+    border-radius: 20px;
+    box-shadow: 0 14px 36px var(--shadow);
   }
 
   // Tablet/desktop: map + fixed-width side panel.
@@ -50,6 +56,12 @@
       grid-template-columns: 1fr 320px;
       gap: 20px;
       padding: 20px;
+
+      .navigate__panel {
+        align-self: start;
+        position: sticky;
+        top: 20px;
+      }
     }
   }
 }

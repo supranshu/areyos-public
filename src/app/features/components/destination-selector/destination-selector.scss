@@ -8,6 +8,7 @@
     font-size: var(--fs-label);
     font-weight: 500;
     color: var(--ink);
+    letter-spacing: 0.02em;
   }
 
   &__input-wrap {
@@ -17,8 +18,10 @@
   &__input {
     width: 100%;
     border: 1px solid var(--hairline);
-    border-radius: 8px;
+    min-height: 48px;
+    border-radius: 12px;
     padding: 12px 14px;
+    background: var(--surface-soft);
     font-family: inherit;
     font-size: 0.95rem;
     color: var(--ink);
@@ -26,6 +29,7 @@
 
     &:focus {
       border-color: var(--brand-blue);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-blue) 20%, transparent);
     }
 
     &:disabled {
@@ -59,6 +63,7 @@
     background: none;
     border: none;
     text-align: left;
+    min-height: 44px;
     padding: 10px 12px;
     border-radius: 6px;
     font-size: 0.9rem;

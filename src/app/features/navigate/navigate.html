@@ -54,7 +54,11 @@
           />
 
           @if (store.route(); as route) {
-            <app-route-summary [route]="route" (clear)="store.clearRoute()" />
+            <app-route-summary
+              [route]="route"
+              (clear)="store.clearRoute()"
+              (complete)="store.completeJourney()"
+            />
           }
         </aside>
       </div>

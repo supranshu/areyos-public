@@ -9,6 +9,9 @@
   --slate:        #6B7280;
   --hairline:            rgba(10, 10, 10, 0.1);
   --hairline-on-dark:    rgba(255, 255, 255, 0.14);
+  --surface-raised:      #FFFFFF;
+  --surface-soft:        #EAF1FF;
+  --shadow:              rgba(24, 84, 200, 0.13);
 
   /* Areyos — Typography */
   --fs-display: clamp(2.6rem, 6.2vw, 4.75rem);
@@ -16,6 +19,20 @@
   --fs-sub:     clamp(1.15rem, 1.8vw, 1.4rem);
   --fs-body:    clamp(1.02rem, 1.2vw, 1.14rem);
   --fs-label:   0.8125rem;
+}
+
+:root[data-theme='dark'] {
+  --brand-blue:     #80AAFF;
+  --action-blue:    #AFC8FF;
+  --ink:            #F5F7FB;
+  --paper:          #171B24;
+  --paper-tint:     #0D1118;
+  --body-gray:      #C4CAD5;
+  --slate:          #919AAA;
+  --hairline:       rgba(255, 255, 255, 0.14);
+  --surface-raised: #1B2230;
+  --surface-soft:   #202E4B;
+  --shadow:         rgba(0, 0, 0, 0.34);
 }
 
 * {
@@ -28,8 +45,14 @@ html, body {
 }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: 'Avenir Next', 'Trebuchet MS', sans-serif;
   background: var(--paper-tint);
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
+  transition: background-color 220ms ease, color 220ms ease;
+}
+
+button,
+input {
+  font: inherit;
 }
