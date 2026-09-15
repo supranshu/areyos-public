@@ -14,12 +14,6 @@ export interface StartPoint {
   x: number;
   y: number;
 }
-
-export interface QrResolveResponse {
-  venue: Venue;
-  startPoint: StartPoint;
-}
-
 export interface Destination {
   nodeId: number;
   name: string;
@@ -58,4 +52,37 @@ export interface FloorPlanMeta {
   mimeType: string;
   width: number;
   height: number;
+}
+
+export interface JourneyDestination {
+  nodeId: number;
+  name: string;
+  floorId: number;
+  floorName: string;
+}
+
+export interface CurrentJourney {
+  sessionId: string;
+  status: 'ACTIVE' | 'COMPLETED' | string;
+  venueId: number;
+  venueName: string;
+  currentPoint: StartPoint;
+  destination: JourneyDestination | null;
+  resumable: boolean;
+}
+
+export interface QrResolveResponse {
+  sessionId: string;
+  hasActiveJourney: boolean;
+  venue: Venue;
+  startPoint: StartPoint;
+  activeJourney: CurrentJourney | null;
+}
+
+export interface CompleteJourneyResponse {
+  sessionId: string;
+  status: 'COMPLETED' | string;
+  venueId: number;
+  venueName: string;
+  resumable: boolean;
 }

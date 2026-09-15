@@ -7,6 +7,7 @@ import {
   Destination,
   RouteResponse,
   FloorPlanMeta,
+  CurrentJourney,
 } from '../models/navigation.models';
 
 export type NavigationPhase =
@@ -24,6 +25,13 @@ export type NavigationPhase =
 export class NavigationStore {
   private readonly api = inject(VisitorApiService);
   private lastCode: string | null = null;
+
+  private readonly sessionStorageKey = 'areyos.sessionId';
+  private readonly _sessionId = signal<string | null>(this.readSessionId());
+  private readonly _journey = signal<CurrentJourney | null>(null);
+
+  readonly sessionId = this._sessionId.asReadonly();
+  readonly journey = this._journey.asReadonly();
 
   private readonly _phase = signal<NavigationPhase>('idle');
   private readonly _errorMessage = signal<string | null>(null);
@@ -84,8 +92,10 @@ export class NavigationStore {
     this._phase.set('resolving-qr');
     this._errorMessage.set(null);
 
-    this.api.resolveQrCode(code).subscribe({
+    this.api.resolveQrCode(code, this._sessionId()).subscribe({
       next: (res) => {
+        this.setSessionId(res.sessionId);
+        this._journey.set(res.activeJourney);
         this._venue.set(res.venue);
         this._startPoint.set(res.startPoint);
         this._activeFloorId.set(res.startPoint.floorId);
@@ -100,27 +110,29 @@ export class NavigationStore {
   }
 
   selectDestination(destination: Destination): void {
-    const startPoint = this._startPoint();
-    const venue = this._venue();
-    if (!startPoint || !venue) return;
+    const sessionId = this._sessionId();
+    if (!sessionId) return;
 
     this._selectedDestination.set(destination);
     this._phase.set('calculating-route');
     this._route.set(null);
 
-    this.api.calculateRoute(venue.id, startPoint.nodeId, destination.nodeId).subscribe({
-      next: (route) => {
-        this._route.set(route);
-        const floorIds = [...new Set(route.points.map((p) => p.floorId))];
-        forkJoin(floorIds.map((id) => this.ensureFloorPlanLoaded(id))).subscribe({
-          next: () => {
-            this._activeFloorId.set(startPoint.floorId);
-            this._phase.set('route-ready');
-          },
-          error: () => this.fail('Could not load floor plans for this route.'),
-        });
-      },
+    this.api.calculateRoute(sessionId, destination.nodeId).subscribe({
+      next: (route) => this.applyRoute(route),
       error: () => this.fail('Could not calculate a route to this destination.'),
+    });
+  }
+
+  private applyRoute(route: RouteResponse): void {
+    this._route.set(route);
+    const startPoint = this._startPoint();
+    const floorIds = [...new Set(route.points.map((p) => p.floorId))];
+    forkJoin(floorIds.map((id) => this.ensureFloorPlanLoaded(id))).subscribe({
+      next: () => {
+        if (startPoint) this._activeFloorId.set(startPoint.floorId);
+        this._phase.set('route-ready');
+      },
+      error: () => this.fail('Could not load floor plans for this route.'),
     });
   }
 
@@ -174,5 +186,14 @@ export class NavigationStore {
   private fail(message: string): void {
     this._errorMessage.set(message);
     this._phase.set('error');
+  }
+
+  private readSessionId(): string | null {
+    return typeof sessionStorage === 'undefined' ? null : sessionStorage.getItem(this.sessionStorageKey);
+  }
+
+  private setSessionId(sessionId: string): void {
+    this._sessionId.set(sessionId);
+    if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(this.sessionStorageKey, sessionId);
   }
 }

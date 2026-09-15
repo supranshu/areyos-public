@@ -1,4 +1,6 @@
 :root {
+  color-scheme: light;
+
   /* Areyos — Brand Colors */
   --brand-blue:   #1854C8;
   --action-blue:  #80AAFF;
@@ -7,8 +9,10 @@
   --paper-tint:   #F4F7FD;
   --body-gray:    #4A4A4A;
   --slate:        #6B7280;
-  --hairline:            rgba(10, 10, 10, 0.1);
-  --hairline-on-dark:    rgba(255, 255, 255, 0.14);
+  --surface-raised: #FFFFFF;
+  --shadow: rgba(10, 10, 10, 0.12);
+  --hairline: rgba(10, 10, 10, 0.1);
+  --hairline-on-dark: rgba(255, 255, 255, 0.14);
 
   /* Areyos — Typography */
   --fs-display: clamp(2.6rem, 6.2vw, 4.75rem);
@@ -16,6 +20,38 @@
   --fs-sub:     clamp(1.15rem, 1.8vw, 1.4rem);
   --fs-body:    clamp(1.02rem, 1.2vw, 1.14rem);
   --fs-label:   0.8125rem;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --brand-blue: #80AAFF;
+  --action-blue: #AFC7FF;
+  --ink: #F4F7FF;
+  --paper: #0F172A;
+  --paper-tint: #111827;
+  --body-gray: #D6DEFA;
+  --slate: #A6B4D1;
+  --surface-raised: #172233;
+  --shadow: rgba(0, 0, 0, 0.45);
+  --hairline: rgba(255, 255, 255, 0.12);
+  --hairline-on-dark: rgba(255, 255, 255, 0.18);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --brand-blue: #80AAFF;
+    --action-blue: #AFC7FF;
+    --ink: #F4F7FF;
+    --paper: #0F172A;
+    --paper-tint: #111827;
+    --body-gray: #D6DEFA;
+    --slate: #A6B4D1;
+    --surface-raised: #172233;
+    --shadow: rgba(0, 0, 0, 0.45);
+    --hairline: rgba(255, 255, 255, 0.12);
+    --hairline-on-dark: rgba(255, 255, 255, 0.18);
+  }
 }
 
 * {
@@ -27,9 +63,14 @@ html, body {
   padding: 0;
 }
 
+html {
+  background: var(--paper-tint);
+}
+
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background: var(--paper-tint);
   color: var(--ink);
+  transition: background-color 0.2s ease, color 0.2s ease;
   -webkit-font-smoothing: antialiased;
 }

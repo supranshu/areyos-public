@@ -1,1 +1,15 @@
-<router-outlet></router-outlet>
+<div class="app-shell">
+  <button
+    type="button"
+    class="app-shell__theme-toggle"
+    (click)="toggleTheme()"
+    [attr.aria-label]="theme() === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
+    [title]="theme() === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
+  >
+    <span class="app-shell__theme-icon" aria-hidden="true">
+      {{ theme() === 'dark' ? '☀️' : '🌙' }}
+    </span>
+  </button>
+
+  <router-outlet></router-outlet>
+</div>

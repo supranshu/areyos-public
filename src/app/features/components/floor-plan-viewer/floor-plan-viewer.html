@@ -28,18 +28,42 @@
           [attr.viewBox]="viewBox()"
           preserveAspectRatio="xMidYMid meet"
         >
+          <defs>
+            <linearGradient id="route-core-gradient" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#80AAFF" />
+              <stop offset="48%" stop-color="#1854C8" />
+              <stop offset="100%" stop-color="#0B3A9B" />
+            </linearGradient>
+            <linearGradient id="route-edge-gradient" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.96" />
+              <stop offset="100%" stop-color="#D8E5FF" stop-opacity="0.72" />
+            </linearGradient>
+            <filter id="route-glow-filter" x="-40%" y="-40%" width="180%" height="180%">
+              <feGaussianBlur stdDeviation="10" />
+            </filter>
+            <filter id="route-shadow-filter" x="-30%" y="-30%" width="160%" height="160%">
+              <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#0B275C" flood-opacity="0.38" />
+            </filter>
+          </defs>
+
           @if (pathD()) {
+            <path class="floor-plan-viewer__route-glow" [attr.d]="pathD()" fill="none" />
+            <path class="floor-plan-viewer__route-edge" [attr.d]="pathD()" fill="none" />
             <path #routeLine class="floor-plan-viewer__route-line" [attr.d]="pathD()" fill="none" />
+            <path class="floor-plan-viewer__route-highlight" [attr.d]="pathD()" fill="none" />
 
             @for (i of arrowIndices; track i) {
               <g #arrowRef class="floor-plan-viewer__flow-arrow" style="opacity: 0">
-                <polygon points="-6,-4 6,0 -6,4" />
+                <circle class="floor-plan-viewer__arrow-halo" r="10" />
+                <circle class="floor-plan-viewer__arrow-disc" r="7" />
+                <polygon class="floor-plan-viewer__arrow-chevron" points="-4,-3 5,0 -4,3 -2,0" />
               </g>
             }
           }
 
           @for (point of waypoints(); track point.nodeId) {
-            <circle class="floor-plan-viewer__waypoint" [attr.cx]="point.x" [attr.cy]="point.y" r="6" />
+            <circle class="floor-plan-viewer__waypoint-ring" [attr.cx]="point.x" [attr.cy]="point.y" r="13" />
+            <circle class="floor-plan-viewer__waypoint" [attr.cx]="point.x" [attr.cy]="point.y" r="5" />
           }
 
           @if (destinationMarkerOnThisFloor(); as dest) {

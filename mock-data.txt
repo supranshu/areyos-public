@@ -1,280 +1,366 @@
 import { Injectable } from '@angular/core';
-import { Observable, of } from 'rxjs';
+import { Observable, of, throwError } from 'rxjs';
 import {
-  QrResolveResponse,
-  Venue,
-  StartPoint,
+  CompleteJourneyResponse,
+  CurrentJourney,
   Destination,
+  FloorPlanMeta,
+  QrResolveResponse,
   RoutePoint,
   RouteResponse,
-  FloorPlanMeta,
+  StartPoint,
+  Venue,
 } from '../../features/navigate/models/navigation.models';
 
-const toSvgDataUrl = (svg: string): string =>
-  'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
+// ---------------------------------------------------------------------------
+// Session-aware mock for VisitorApiService — EPZA 50-Bed Hospital, Karachi.
+// Node coordinates are keyed to the real floor plan's pixel dimensions
+// (~1390x1040), so if the placeholder SVG backgrounds below are ever swapped
+// for the actual scanned floor plan images, marker positions should still
+// land close to correct without re-deriving coordinates.
+// Paste this over visitor-api.ts's contents for local UI work; same class
+// name, same method signatures — no other file needs to change.
+// ---------------------------------------------------------------------------
 
-// These plans are deliberately map-like rather than decorative: the coordinates
-// match the destination and route nodes below, so the overlay remains useful.
-const MOCK_FLOOR_PLAN_IMAGE_URLS: Record<number, string> = {
-  1: toSvgDataUrl(`
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 760">
-      <rect width="1200" height="760" fill="#f3efe6"/>
-      <rect x="52" y="52" width="1096" height="656" rx="4" fill="#fbfaf6" stroke="#263b3a" stroke-width="10"/>
-      <path d="M70 372H1130 M450 62V372 M790 62V372 M450 372V698 M790 372V698" fill="none" stroke="#263b3a" stroke-width="8"/>
-      <path d="M70 160H450 M790 190H1130 M70 570H450 M790 560H1130" fill="none" stroke="#263b3a" stroke-width="8"/>
-      <path d="M450 250H790 M180 372V160 M980 372V190 M300 372V570 M930 372V560" fill="none" stroke="#c6bda9" stroke-width="5" stroke-dasharray="16 12"/>
-      <rect x="450" y="372" width="340" height="64" fill="#e3ded2" stroke="#263b3a" stroke-width="6"/>
-      <rect x="666" y="470" width="118" height="112" fill="#d7e1dc" stroke="#263b3a" stroke-width="6"/>
-      <path d="M702 490v72M748 490v72M682 512h86M682 540h86" fill="none" stroke="#55716c" stroke-width="4"/>
-      <path d="M162 52v-30h70v30 M925 708v30h70v-30" fill="none" stroke="#263b3a" stroke-width="10"/>
-      <g font-family="Arial, sans-serif" fill="#263b3a" text-anchor="middle">
-        <text x="600" y="32" font-size="22" font-weight="700">AREYOS VISITOR CENTRE</text>
-        <text x="195" y="110" font-size="18" font-weight="700">WELCOME HALL</text><text x="195" y="135" font-size="14">NORTH ENTRANCE</text>
-        <text x="620" y="115" font-size="18" font-weight="700">GALLERY A</text><text x="620" y="140" font-size="14">PERMANENT COLLECTION</text>
-        <text x="960" y="115" font-size="18" font-weight="700">GALLERY B</text><text x="960" y="140" font-size="14">TEMPORARY EXHIBITION</text>
-        <text x="265" y="485" font-size="18" font-weight="700">AUDITORIUM</text><text x="265" y="510" font-size="14">SEATS 120</text>
-        <text x="545" y="480" font-size="15" font-weight="700">RESTROOMS</text>
-        <text x="725" y="510" font-size="15" font-weight="700">LIFT + STAIRS</text>
-        <text x="955" y="485" font-size="18" font-weight="700">MUSEUM SHOP</text><text x="955" y="510" font-size="14">EXIT TO GARDEN</text>
-        <text x="620" y="414" font-size="15" font-weight="700">CENTRAL CONCOURSE</text>
-        <text x="960" y="735" font-size="14">SOUTH EXIT</text>
-      </g>
-      <g fill="#d3a34b" stroke="#263b3a" stroke-width="3"><circle cx="180" cy="372" r="9"/><circle cx="450" cy="372" r="9"/><circle cx="790" cy="372" r="9"/><circle cx="725" cy="526" r="9"/></g>
-    </svg>
-  `),
-  2: toSvgDataUrl(`
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 760">
-      <rect width="1200" height="760" fill="#edf1ee"/>
-      <rect x="52" y="52" width="1096" height="656" rx="4" fill="#f9fbf8" stroke="#263b3a" stroke-width="10"/>
-      <path d="M70 350H1130 M390 62V350 M820 62V350 M390 350V698 M820 350V698" fill="none" stroke="#263b3a" stroke-width="8"/>
-      <path d="M70 170H390 M820 210H1130 M70 548H390 M820 545H1130" fill="none" stroke="#263b3a" stroke-width="8"/>
-      <path d="M390 255H820 M195 350V170 M985 350V210 M250 350V548 M950 350V545" fill="none" stroke="#aebfb6" stroke-width="5" stroke-dasharray="16 12"/>
-      <rect x="390" y="350" width="430" height="64" fill="#dce7e1" stroke="#263b3a" stroke-width="6"/>
-      <rect x="666" y="470" width="118" height="112" fill="#d7e1dc" stroke="#263b3a" stroke-width="6"/>
-      <path d="M702 490v72M748 490v72M682 512h86M682 540h86" fill="none" stroke="#55716c" stroke-width="4"/>
-      <path d="M170 52v-30h70v30 M928 708v30h70v-30" fill="none" stroke="#263b3a" stroke-width="10"/>
-      <g font-family="Arial, sans-serif" fill="#263b3a" text-anchor="middle">
-        <text x="600" y="32" font-size="22" font-weight="700">AREYOS VISITOR CENTRE</text>
-        <text x="220" y="115" font-size="18" font-weight="700">LEARNING STUDIO</text><text x="220" y="140" font-size="14">WORKSHOPS + TALKS</text>
-        <text x="605" y="115" font-size="18" font-weight="700">ARCHIVE ROOM</text><text x="605" y="140" font-size="14">STAFF ACCESS</text>
-        <text x="970" y="115" font-size="18" font-weight="700">ROOFTOP CAFE</text><text x="970" y="140" font-size="14">SEATING 80</text>
-        <text x="220" y="490" font-size="18" font-weight="700">READING ROOM</text><text x="220" y="515" font-size="14">QUIET ZONE</text>
-        <text x="545" y="480" font-size="15" font-weight="700">RESTROOMS</text>
-        <text x="725" y="510" font-size="15" font-weight="700">LIFT + STAIRS</text>
-        <text x="970" y="485" font-size="18" font-weight="700">SKY TERRACE</text><text x="970" y="510" font-size="14">OPEN AIR</text>
-        <text x="605" y="392" font-size="15" font-weight="700">UPPER CONCOURSE</text>
-        <text x="963" y="735" font-size="14">TERRACE EXIT</text>
-      </g>
-      <g fill="#d3a34b" stroke="#263b3a" stroke-width="3"><circle cx="195" cy="350" r="9"/><circle cx="390" cy="350" r="9"/><circle cx="820" cy="350" r="9"/><circle cx="725" cy="526" r="9"/></g>
-    </svg>
-  `),
-};
 
 const MOCK_VENUE: Venue = {
-  id: 42,
-  name: 'Areyos Visitor Centre',
-  type: 'VISITOR_CENTRE',
+  id: 1,
+  name: 'EPZA 50-Bed Hospital',
+  type: 'HOSPITAL',
 };
 
-const MOCK_START_POINT: StartPoint = {
-  nodeId: 101,
-  name: 'North Entrance',
-  floorId: 1,
-  floorName: 'Ground Floor',
-  x: 180,
-  y: 80,
+type NodeType = 'ENTRANCE' | 'STAIRS' | 'JUNCTION' | 'DESTINATION';
+
+interface MockNode {
+  nodeId: number;
+  name: string;
+  type: NodeType;
+  floorId: number;
+  floorName: string;
+  x: number;
+  y: number;
+}
+
+const FLOOR_NAMES: Record<number, string> = { 1: 'Ground Floor', 2: 'First Floor' };
+
+// --- Ground Floor nodes (101-1xx) -----------------------------------------
+// Emergency, OPD consultants, radiology/ultrasound, pharmacy, laboratory.
+const GROUND_NODES: MockNode[] = [
+  { nodeId: 101, name: 'Main Entrance', type: 'ENTRANCE', floorId: 1, floorName: FLOOR_NAMES[1], x: 730, y: 884 },
+  { nodeId: 102, name: 'Entrance Corridor', type: 'JUNCTION', floorId: 1, floorName: FLOOR_NAMES[1], x: 730, y: 808 },
+  { nodeId: 103, name: 'Central Lobby', type: 'JUNCTION', floorId: 1, floorName: FLOOR_NAMES[1], x: 722, y: 391 },
+  { nodeId: 104, name: 'Central Staircase', type: 'STAIRS', floorId: 1, floorName: FLOOR_NAMES[1], x: 563, y: 289 },
+  { nodeId: 105, name: 'West Corridor', type: 'JUNCTION', floorId: 1, floorName: FLOOR_NAMES[1], x: 170, y: 460 },
+  { nodeId: 106, name: 'East Corridor', type: 'JUNCTION', floorId: 1, floorName: FLOOR_NAMES[1], x: 1050, y: 460 },
+  { nodeId: 107, name: 'Center Hall Junction', type: 'JUNCTION', floorId: 1, floorName: FLOOR_NAMES[1], x: 722, y: 610 },
+  { nodeId: 108, name: 'West Staircase', type: 'STAIRS', floorId: 1, floorName: FLOOR_NAMES[1], x: 123, y: 782 },
+  { nodeId: 109, name: 'East Staircase', type: 'STAIRS', floorId: 1, floorName: FLOOR_NAMES[1], x: 1281, y: 782 },
+  { nodeId: 126, name: 'Lower-West Corridor', type: 'JUNCTION', floorId: 1, floorName: FLOOR_NAMES[1], x: 280, y: 662 },
+  // New: hall junctions — these turn the old room-to-room diagonals into
+  // clean axis-aligned hops along the real open corridor band (y≈610).
+  { nodeId: 131, name: 'West Hall Junction', type: 'JUNCTION', floorId: 1, floorName: FLOOR_NAMES[1], x: 170, y: 610 },
+  { nodeId: 132, name: 'Lab Hall Junction', type: 'JUNCTION', floorId: 1, floorName: FLOOR_NAMES[1], x: 520, y: 610 },
+  { nodeId: 133, name: 'Pharmacy Hall Junction', type: 'JUNCTION', floorId: 1, floorName: FLOOR_NAMES[1], x: 930, y: 610 },
+  { nodeId: 135, name: 'East Hall Junction', type: 'JUNCTION', floorId: 1, floorName: FLOOR_NAMES[1], x: 1050, y: 610 },
+
+  { nodeId: 110, name: "Men's Restroom", type: 'DESTINATION', floorId: 1, floorName: FLOOR_NAMES[1], x: 133, y: 316 },
+  { nodeId: 111, name: "Women's Restroom", type: 'DESTINATION', floorId: 1, floorName: FLOOR_NAMES[1], x: 398, y: 316 },
+  { nodeId: 112, name: 'Consultant Room A', type: 'DESTINATION', floorId: 1, floorName: FLOOR_NAMES[1], x: 173, y: 398 },
+  { nodeId: 113, name: 'Consultant Room B', type: 'DESTINATION', floorId: 1, floorName: FLOOR_NAMES[1], x: 173, y: 516 },
+  { nodeId: 114, name: 'X-Ray Room', type: 'DESTINATION', floorId: 1, floorName: FLOOR_NAMES[1], x: 526, y: 461 },
+  { nodeId: 115, name: 'Ultrasound Room', type: 'DESTINATION', floorId: 1, floorName: FLOOR_NAMES[1], x: 403, y: 493 },
+  { nodeId: 116, name: "Nurses' Room", type: 'DESTINATION', floorId: 1, floorName: FLOOR_NAMES[1], x: 960, y: 402 },
+  { nodeId: 117, name: "Nurses' Station (North)", type: 'DESTINATION', floorId: 1, floorName: FLOOR_NAMES[1], x: 758, y: 493 },
+  { nodeId: 118, name: 'Emergency Room', type: 'DESTINATION', floorId: 1, floorName: FLOOR_NAMES[1], x: 1160, y: 351 },
+  { nodeId: 119, name: "Nurses' Station (East)", type: 'DESTINATION', floorId: 1, floorName: FLOOR_NAMES[1], x: 1132, y: 493 },
+  { nodeId: 120, name: "Nurses' Station (South)", type: 'DESTINATION', floorId: 1, floorName: FLOOR_NAMES[1], x: 321, y: 662 },
+  { nodeId: 121, name: 'Consultant Room C', type: 'DESTINATION', floorId: 1, floorName: FLOOR_NAMES[1], x: 254, y: 770 },
+  { nodeId: 122, name: 'Consultant Room D', type: 'DESTINATION', floorId: 1, floorName: FLOOR_NAMES[1], x: 368, y: 770 },
+  { nodeId: 123, name: 'Laboratory', type: 'DESTINATION', floorId: 1, floorName: FLOOR_NAMES[1], x: 528, y: 770 },
+  { nodeId: 124, name: 'Pharmacy', type: 'DESTINATION', floorId: 1, floorName: FLOOR_NAMES[1], x: 886, y: 804 },
+  { nodeId: 125, name: "Doctors' Common Room", type: 'DESTINATION', floorId: 1, floorName: FLOOR_NAMES[1], x: 1047, y: 793 },
+];
+
+const FIRST_NODES: MockNode[] = [
+  { nodeId: 201, name: 'Upper Lobby', type: 'JUNCTION', floorId: 2, floorName: FLOOR_NAMES[2], x: 700, y: 286 },
+  { nodeId: 202, name: 'Central Staircase', type: 'STAIRS', floorId: 2, floorName: FLOOR_NAMES[2], x: 540, y: 212 },
+  { nodeId: 203, name: 'West Corridor Junction', type: 'JUNCTION', floorId: 2, floorName: FLOOR_NAMES[2], x: 369, y: 286 },
+  { nodeId: 204, name: 'Central Nurses Junction', type: 'JUNCTION', floorId: 2, floorName: FLOOR_NAMES[2], x: 738, y: 413 },
+  { nodeId: 205, name: 'South Corridor Junction', type: 'JUNCTION', floorId: 2, floorName: FLOOR_NAMES[2], x: 700, y: 545 },
+  { nodeId: 206, name: 'West Staircase', type: 'STAIRS', floorId: 2, floorName: FLOOR_NAMES[2], x: 56, y: 684 },
+  { nodeId: 207, name: 'East Staircase', type: 'STAIRS', floorId: 2, floorName: FLOOR_NAMES[2], x: 1336, y: 688 },
+  { nodeId: 208, name: 'Waiting Junction', type: 'JUNCTION', floorId: 2, floorName: FLOOR_NAMES[2], x: 694, y: 693 },
+  { nodeId: 215, name: 'West Wing Lower Corridor', type: 'JUNCTION', floorId: 2, floorName: FLOOR_NAMES[2], x: 329, y: 550 },
+  // New: closes the gap between the top-of-wing rooms and the lower corridor hub.
+  { nodeId: 230, name: 'West Wing Upper Corridor', type: 'JUNCTION', floorId: 2, floorName: FLOOR_NAMES[2], x: 280, y: 460 },
+
+  { nodeId: 209, name: 'Delivery Room', type: 'DESTINATION', floorId: 2, floorName: FLOOR_NAMES[2], x: 187, y: 442 },
+  { nodeId: 210, name: 'Sterilizer Room', type: 'DESTINATION', floorId: 2, floorName: FLOOR_NAMES[2], x: 291, y: 363 },
+  { nodeId: 211, name: 'Scrub Room', type: 'DESTINATION', floorId: 2, floorName: FLOOR_NAMES[2], x: 302, y: 413 },
+  { nodeId: 212, name: 'Pre-Natal / Labour Room', type: 'DESTINATION', floorId: 2, floorName: FLOOR_NAMES[2], x: 511, y: 392 },
+  { nodeId: 213, name: 'Aseptic Room', type: 'DESTINATION', floorId: 2, floorName: FLOOR_NAMES[2], x: 397, y: 510 },
+  { nodeId: 216, name: 'Store Room', type: 'DESTINATION', floorId: 2, floorName: FLOOR_NAMES[2], x: 228, y: 603 },
+  { nodeId: 217, name: 'Recovery Room', type: 'DESTINATION', floorId: 2, floorName: FLOOR_NAMES[2], x: 289, y: 683 },
+  { nodeId: 218, name: 'Paediatrics Ward', type: 'DESTINATION', floorId: 2, floorName: FLOOR_NAMES[2], x: 513, y: 641 },
+  { nodeId: 219, name: "Nurses' Room", type: 'DESTINATION', floorId: 2, floorName: FLOOR_NAMES[2], x: 935, y: 318 },
+  { nodeId: 220, name: "Nurses' Station (East)", type: 'DESTINATION', floorId: 2, floorName: FLOOR_NAMES[2], x: 1096, y: 402 },
+  { nodeId: 221, name: 'Female Ward', type: 'DESTINATION', floorId: 2, floorName: FLOOR_NAMES[2], x: 1058, y: 508 },
+  { nodeId: 222, name: 'General Ward (South)', type: 'DESTINATION', floorId: 2, floorName: FLOOR_NAMES[2], x: 908, y: 688 },
+];
+
+const NODES: MockNode[] = [...GROUND_NODES, ...FIRST_NODES];
+const NODE_BY_ID = new Map(NODES.map((n) => [n.nodeId, n]));
+
+// --- Edges (undirected, weighted by real pixel distance) -----------------
+// Vertical stair hops are weighted heavier than a same-floor step to
+// reflect real travel cost (climbing a flight), not just pixel distance.
+const STAIR_HOP_WEIGHT = 220;
+
+interface Edge { a: number; b: number; weight: number }
+const distance = (a: MockNode, b: MockNode) => Math.hypot(a.x - b.x, a.y - b.y);
+const d = (a: number, b: number) => distance(NODE_BY_ID.get(a)!, NODE_BY_ID.get(b)!);
+
+const EDGES: Edge[] = [
+  // --- Ground floor circulation ---
+  { a: 101, b: 102, weight: d(101, 102) },
+  { a: 102, b: 107, weight: d(102, 107) },
+  { a: 107, b: 103, weight: d(107, 103) },
+  { a: 103, b: 104, weight: d(103, 104) },
+  { a: 103, b: 105, weight: d(103, 105) },
+  { a: 103, b: 106, weight: d(103, 106) },
+  { a: 104, b: 114, weight: d(104, 114) },
+  { a: 104, b: 115, weight: d(104, 115) },
+  { a: 105, b: 110, weight: d(105, 110) },
+  { a: 105, b: 111, weight: d(105, 111) },
+  { a: 105, b: 112, weight: d(105, 112) },
+  { a: 105, b: 126, weight: d(105, 126) },
+  { a: 126, b: 113, weight: d(126, 113) },
+  { a: 126, b: 120, weight: d(126, 120) },
+  { a: 120, b: 121, weight: d(120, 121) },
+  { a: 120, b: 122, weight: d(120, 122) },
+  { a: 107, b: 123, weight: d(107, 123) },
+  { a: 102, b: 124, weight: d(102, 124) },
+  { a: 102, b: 125, weight: d(102, 125) },
+  { a: 106, b: 116, weight: d(106, 116) },
+  { a: 106, b: 117, weight: d(106, 117) },
+  { a: 106, b: 118, weight: d(106, 118) },
+  { a: 106, b: 119, weight: d(106, 119) },
+  { a: 108, b: 126, weight: d(108, 126) },
+  { a: 109, b: 119, weight: d(109, 119) },
+  { a: 109, b: 125, weight: d(109, 125) },
+
+  // --- First floor circulation ---
+  { a: 201, b: 202, weight: d(201, 202) },
+  { a: 201, b: 203, weight: d(201, 203) },
+  { a: 201, b: 204, weight: d(201, 204) },
+  { a: 201, b: 205, weight: d(201, 205) },
+  { a: 205, b: 208, weight: d(205, 208) },
+  { a: 203, b: 210, weight: d(203, 210) },
+  { a: 203, b: 209, weight: d(203, 209) },
+  { a: 203, b: 211, weight: d(203, 211) },
+  { a: 203, b: 212, weight: d(203, 212) },
+  { a: 203, b: 215, weight: d(203, 215) },
+  { a: 215, b: 213, weight: d(215, 213) },
+  { a: 215, b: 216, weight: d(215, 216) },
+  { a: 215, b: 217, weight: d(215, 217) },
+  { a: 215, b: 218, weight: d(215, 218) },
+  { a: 204, b: 219, weight: d(204, 219) },
+  { a: 204, b: 220, weight: d(204, 220) },
+  { a: 204, b: 221, weight: d(204, 221) },
+  { a: 208, b: 222, weight: d(208, 222) },
+  { a: 206, b: 216, weight: d(206, 216) },
+  { a: 207, b: 220, weight: d(207, 220) },
+
+  // --- Vertical connectors — three stairwells, matching the plan ---
+  { a: 104, b: 202, weight: STAIR_HOP_WEIGHT },      // central staircase
+  { a: 108, b: 206, weight: STAIR_HOP_WEIGHT },       // west staircase
+  { a: 109, b: 207, weight: STAIR_HOP_WEIGHT },       // east staircase
+];
+
+// --- Dijkstra (safety-limited — throws instead of hanging on a bad edit) --
+function shortestPath(fromId: number, toId: number): number[] | null {
+  const adjacency = new Map<number, { to: number; weight: number }[]>();
+  for (const node of NODES) adjacency.set(node.nodeId, []);
+  for (const edge of EDGES) {
+    adjacency.get(edge.a)!.push({ to: edge.b, weight: edge.weight });
+    adjacency.get(edge.b)!.push({ to: edge.a, weight: edge.weight });
+  }
+
+  const dist = new Map<number, number>(NODES.map((n) => [n.nodeId, Infinity]));
+  const prev = new Map<number, number | null>();
+  const visited = new Set<number>();
+  dist.set(fromId, 0);
+
+  let safety = 0;
+  while (visited.size < NODES.length) {
+    if (++safety > 2000) {
+      console.error('shortestPath: safety limit hit', { fromId, toId });
+      throw new Error('shortestPath exceeded safety limit — see console');
+    }
+    let current: number | null = null;
+    let currentDist = Infinity;
+    for (const [nodeId, dd] of dist) {
+      if (!visited.has(nodeId) && dd < currentDist) {
+        current = nodeId;
+        currentDist = dd;
+      }
+    }
+    if (current === null || current === toId) break;
+    visited.add(current);
+    for (const { to, weight } of adjacency.get(current)!) {
+      const candidate = currentDist + weight;
+      if (candidate < (dist.get(to) ?? Infinity)) {
+        dist.set(to, candidate);
+        prev.set(to, current);
+      }
+    }
+  }
+
+  if (dist.get(toId) === Infinity) return null;
+
+  const path: number[] = [];
+  let step: number | null = toId;
+  let safety2 = 0;
+  while (step !== null) {
+    if (++safety2 > 2000) throw new Error('path reconstruction exceeded safety limit');
+    path.unshift(step);
+    step = prev.get(step) ?? null;
+  }
+  return path;
+}
+
+function buildRoute(fromNodeId: number, toNodeId: number): RouteResponse | null {
+  const path = shortestPath(fromNodeId, toNodeId);
+  if (!path) return null;
+
+  const points: RoutePoint[] = path.map((id) => {
+    const node = NODE_BY_ID.get(id)!;
+    return { nodeId: node.nodeId, name: node.name, type: node.type, floorId: node.floorId, floorName: node.floorName, x: node.x, y: node.y };
+  });
+
+  let totalDistance = 0;
+  for (let i = 1; i < path.length; i++) {
+    const edge = EDGES.find((e) => (e.a === path[i - 1] && e.b === path[i]) || (e.b === path[i - 1] && e.a === path[i]));
+    totalDistance += edge?.weight ?? 0;
+  }
+
+  return {
+    venueId: MOCK_VENUE.id,
+    fromNodeId,
+    toNodeId,
+    totalDistance: Math.round(totalDistance * 100) / 100,
+    estimatedTimeMinutes: Math.max(1, Math.ceil(totalDistance / 90)),
+    points,
+  };
+}
+
+// --- QR entry points -------------------------------------------------------
+const QR_TO_NODE_ID: Record<string, number> = {
+  'main-entrance': 101,
+  'west-stairs': 108,
+  'east-stairs': 109,
+  'first-floor-landing': 202,
 };
 
-const MOCK_DESTINATIONS: Destination[] = [
-  {
-    nodeId: 201,
-    name: 'Information Desk',
-    type: 'DESTINATION',
-    floorId: 1,
-    floorName: 'Ground Floor',
-    x: 420,
-    y: 300,
-  },
-  {
-    nodeId: 202,
-    name: 'Gallery A',
-    type: 'DESTINATION',
-    floorId: 1,
-    floorName: 'Ground Floor',
-    x: 620,
-    y: 200,
-  },
-  {
-    nodeId: 203,
-    name: 'Gallery B',
-    type: 'DESTINATION',
-    floorId: 1,
-    floorName: 'Ground Floor',
-    x: 960,
-    y: 200,
-  },
-  {
-    nodeId: 204,
-    name: 'Auditorium',
-    type: 'DESTINATION',
-    floorId: 1,
-    floorName: 'Ground Floor',
-    x: 265,
-    y: 530,
-  },
-  {
-    nodeId: 205,
-    name: 'Museum Shop',
-    type: 'DESTINATION',
-    floorId: 1,
-    floorName: 'Ground Floor',
-    x: 955,
-    y: 530,
-  },
-  {
-    nodeId: 301,
-    name: 'Learning Studio',
-    type: 'DESTINATION',
-    floorId: 2,
-    floorName: 'First Floor',
-    x: 220,
-    y: 200,
-  },
-  {
-    nodeId: 302,
-    name: 'Rooftop Cafe',
-    type: 'DESTINATION',
-    floorId: 2,
-    floorName: 'First Floor',
-    x: 970,
-    y: 200,
-  },
-  {
-    nodeId: 303,
-    name: 'Reading Room',
-    type: 'DESTINATION',
-    floorId: 2,
-    floorName: 'First Floor',
-    x: 220,
-    y: 530,
-  },
-  {
-    nodeId: 304,
-    name: 'Sky Terrace',
-    type: 'DESTINATION',
-    floorId: 2,
-    floorName: 'First Floor',
-    x: 970,
-    y: 530,
-  },
+const toStartPoint = (node: MockNode): StartPoint => ({
+  nodeId: node.nodeId, name: node.name, floorId: node.floorId, floorName: node.floorName, x: node.x, y: node.y,
+});
+
+const DESTINATIONS: Destination[] = NODES.filter((n) => n.type === 'DESTINATION').map((n) => ({
+  nodeId: n.nodeId, name: n.name, type: n.type, floorId: n.floorId, floorName: n.floorName, x: n.x, y: n.y,
+}));
+
+const FLOOR_PLANS: FloorPlanMeta[] = [
+  { floorId: 1, floorName: FLOOR_NAMES[1], floorNumber: 0, storageKey: 'epza-hospital/ground', fileName: 'epza-ground-floor.png', mimeType: 'image/png', width: 1400, height: 1022 },
+  { floorId: 2, floorName: FLOOR_NAMES[2], floorNumber: 1, storageKey: 'epza-hospital/first', fileName: 'epza-first-floor.jpg', mimeType: 'image/jpeg', width: 1400, height: 963 },
 ];
 
-const MOCK_FLOOR_PLANS: FloorPlanMeta[] = [
-  {
-    floorId: 1,
-    floorName: 'Ground Floor',
-    floorNumber: 0,
-    storageKey: 'mock-ground-floor',
-    fileName: 'ground-floor.svg',
-    mimeType: 'image/svg+xml',
-    width: 1200,
-    height: 760,
-  },
-  {
-    floorId: 2,
-    floorName: 'First Floor',
-    floorNumber: 1,
-    storageKey: 'mock-first-floor',
-    fileName: 'first-floor.svg',
-    mimeType: 'image/svg+xml',
-    width: 1200,
-    height: 760,
-  },
-];
+// Simplified schematic placeholders — swap for the real scanned floor plans
+// whenever you have them; coordinates above are keyed to this same 1390x1040
+// canvas, so markers should land close to correct without changes.
+const FLOOR_PLAN_IMAGE_PATHS: Record<number, string> = {
+  1: '../../../assets/floor-plans/epza-ground-floor.jpeg',
+  2: '../../../assets/floor-plans/epza-first-floor.png',
+};
+
+// --- Session state ---------------------------------------------------------
+interface MockSession { sessionId: string; currentPoint: StartPoint; destinationNodeId: number | null; status: 'ACTIVE' | 'COMPLETED'; }
+const sessions = new Map<string, MockSession>();
+let nextSessionNumber = 1;
 
 @Injectable({ providedIn: 'root' })
 export class VisitorApiService {
-  resolveQrCode(code: string): Observable<QrResolveResponse> {
-    return of({ venue: MOCK_VENUE, startPoint: MOCK_START_POINT });
+  resolveQrCode(code: string, sessionId?: string | null): Observable<QrResolveResponse> {
+    const nodeId = QR_TO_NODE_ID[code] ?? QR_TO_NODE_ID['main-entrance'];
+    const node = NODE_BY_ID.get(nodeId)!;
+    const startPoint = toStartPoint(node);
+    const existing = sessionId ? sessions.get(sessionId) : undefined;
+    const session = existing ?? this.createSession(startPoint);
+    session.currentPoint = startPoint;
+    session.status = 'ACTIVE';
+    return of({ sessionId: session.sessionId, hasActiveJourney: session.destinationNodeId !== null, venue: MOCK_VENUE, startPoint, activeJourney: this.toCurrentJourney(session) });
   }
 
   getDestinations(venueId: number): Observable<Destination[]> {
-    return of(MOCK_DESTINATIONS);
+    return venueId === MOCK_VENUE.id ? of(DESTINATIONS) : throwError(() => new Error('Venue not found'));
   }
 
-  calculateRoute(venueId: number, fromNodeId: number, toNodeId: number): Observable<RouteResponse> {
-    const destination = MOCK_DESTINATIONS.find((item) => item.nodeId === toNodeId) ?? MOCK_DESTINATIONS[0];
-    const points: RoutePoint[] = [
-      { ...MOCK_START_POINT, type: 'JUNCTION' },
-      {
-        nodeId: 401,
-        name: 'Welcome Hall Junction',
-        type: 'JUNCTION',
-        floorId: 1,
-        floorName: 'Ground Floor',
-        x: 180,
-        y: 372,
-      },
-    ];
+  calculateRoute(sessionId: string, destinationNodeId: number): Observable<RouteResponse> {
+    const session = sessions.get(sessionId);
+    if (!session) return throwError(() => new Error('Session not found'));
+    const route = buildRoute(session.currentPoint.nodeId, destinationNodeId);
+    if (!route) return throwError(() => new Error('No path found to this destination'));
+    session.destinationNodeId = destinationNodeId;
+    return of(route);
+  }
 
-    if (destination.floorId === 1) {
-      points.push({
-        nodeId: 402,
-        name: 'Central Concourse',
-        type: 'JUNCTION',
-        floorId: 1,
-        floorName: 'Ground Floor',
-        x: 620,
-        y: 372,
-      });
-    } else {
-      points.push({
-        nodeId: 403,
-        name: 'Lift and Stair Core',
-        type: 'ELEVATOR',
-        floorId: 1,
-        floorName: 'Ground Floor',
-        x: 725,
-        y: 526,
-      });
-      points.push({
-        nodeId: 404,
-        name: 'Lift and Stair Core',
-        type: 'ELEVATOR',
-        floorId: 2,
-        floorName: 'First Floor',
-        x: 725,
-        y: 526,
-      });
-      points.push({
-        nodeId: 405,
-        name: 'Upper Concourse',
-        type: 'JUNCTION',
-        floorId: 2,
-        floorName: 'First Floor',
-        x: 605,
-        y: 350,
-      });
-    }
+  getCurrentJourney(sessionId: string): Observable<CurrentJourney> {
+    const session = sessions.get(sessionId);
+    const journey = session ? this.toCurrentJourney(session) : null;
+    return journey ? of(journey) : throwError(() => new Error('Session not found'));
+  }
 
-    points.push(destination);
+  updateLocation(sessionId: string, nodeId: number): Observable<RouteResponse> {
+    const session = sessions.get(sessionId);
+    const node = NODE_BY_ID.get(nodeId);
+    if (!session || !node || session.destinationNodeId === null) return throwError(() => new Error('No active journey to update'));
+    session.currentPoint = toStartPoint(node);
+    const route = buildRoute(nodeId, session.destinationNodeId);
+    return route ? of(route) : throwError(() => new Error('No path found to this destination'));
+  }
 
-    return of({
-      venueId,
-      fromNodeId,
-      toNodeId: destination.nodeId,
-      totalDistance: destination.floorId === MOCK_START_POINT.floorId ? 150 : 260,
-      estimatedTimeMinutes: destination.floorId === MOCK_START_POINT.floorId ? 3 : 5,
-      points,
-    });
+  completeJourney(sessionId: string): Observable<CompleteJourneyResponse> {
+    const session = sessions.get(sessionId);
+    if (!session) return throwError(() => new Error('Session not found'));
+    session.status = 'COMPLETED';
+    session.destinationNodeId = null;
+    return of({ sessionId, status: 'COMPLETED', venueId: MOCK_VENUE.id, venueName: MOCK_VENUE.name, resumable: false });
   }
 
   getFloorPlanMeta(floorId: number): Observable<FloorPlanMeta> {
-    return of(MOCK_FLOOR_PLANS.find((plan) => plan.floorId === floorId) ?? MOCK_FLOOR_PLANS[0]);
+    const plan = FLOOR_PLANS.find((p) => p.floorId === floorId);
+    return plan ? of(plan) : throwError(() => new Error('Floor plan not found'));
   }
 
-  /** Used directly as an <img [src]> — no need to route binary bytes through HttpClient. */
   getFloorPlanImageUrl(floorId: number): string {
-    return MOCK_FLOOR_PLAN_IMAGE_URLS[floorId] ?? MOCK_FLOOR_PLAN_IMAGE_URLS[1];
+    return FLOOR_PLAN_IMAGE_PATHS[floorId] ?? FLOOR_PLAN_IMAGE_PATHS[1];
+  }
+
+  private createSession(currentPoint: StartPoint): MockSession {
+    const session: MockSession = { sessionId: `mock-session-${String(nextSessionNumber++).padStart(4, '0')}`, currentPoint, destinationNodeId: null, status: 'ACTIVE' };
+    sessions.set(session.sessionId, session);
+    return session;
+  }
+
+  private toCurrentJourney(session: MockSession): CurrentJourney | null {
+    if (session.destinationNodeId === null) return null;
+    const destinationNode = NODE_BY_ID.get(session.destinationNodeId);
+    if (!destinationNode) return null;
+    return {
+      sessionId: session.sessionId, status: session.status, venueId: MOCK_VENUE.id, venueName: MOCK_VENUE.name,
+      currentPoint: session.currentPoint,
+      destination: { nodeId: destinationNode.nodeId, name: destinationNode.name, floorId: destinationNode.floorId, floorName: destinationNode.floorName },
+      resumable: session.status === 'ACTIVE',
+    };
   }
 }
