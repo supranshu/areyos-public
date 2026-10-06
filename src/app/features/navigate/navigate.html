@@ -1,63 +1,179 @@
-<main class="navigate">
-  @switch (store.phase()) {
-    @case ('idle') {
-      <div class="navigate__state">
-        <p>Scan a location QR code to begin.</p>
-      </div>
-    }
-    @case ('resolving-qr') {
-      <div class="navigate__state">
-        <div class="navigate__spinner"></div>
-        <p>Reading QR code…</p>
-      </div>
-    }
-    @case ('loading-venue-data') {
-      <div class="navigate__state">
-        <div class="navigate__spinner"></div>
-        <p>Loading venue details…</p>
-      </div>
-    }
-    @case ('error') {
-      <div class="navigate__state navigate__state--error">
-        <p>{{ store.errorMessage() }}</p>
-        <button type="button" (click)="store.retry()">Try Again</button>
-      </div>
-    }
-    @default {
-      @if (store.venue(); as venue) {
-        <app-location-banner [venue]="venue" [startPoint]="store.startPoint()!" />
-      }
-
-      <div class="navigate__body">
-        <app-floor-plan-viewer
-          [imageUrl]="store.activeFloorPlan() ? store.getFloorPlanImageUrl(store.activeFloorPlan()!.floorId) : null"
-          [floorPlan]="store.activeFloorPlan()"
-          [startPoint]="store.startPoint()"
-          [destination]="store.selectedDestination()"
-          [routePoints]="store.visibleRoutePoints()"
+@switch (store.phase()) {
+  @case ('idle') {
+    <app-splash-screen [illustration]="true">
+      <p class="navigate__lead">Scan the Areyos QR code in front of you to get started.</p>
+      <button type="button" class="btn-primary navigate__wide" (click)="scannerOpen.set(true)">
+        <span class="mi">qr_code_scanner</span>
+        Scan QR code
+      </button>
+      <p class="navigate__or">or enter the code</p>
+      <form class="navigate__code-form" (submit)="submitManualCode($event)">
+        <input
+          type="text"
+          placeholder="e.g. AREYOS-2-…"
+          autocapitalize="characters"
+          [value]="manualCode()"
+          (input)="manualCode.set($any($event.target).value)"
         />
-
-        <aside class="navigate__panel">
-          @if (store.routeFloors().length > 1) {
-            <app-floor-switcher
-              [floors]="store.routeFloors()"
-              [activeFloorId]="store.activeFloorId()"
-              (floorSelected)="store.setActiveFloor($event)"
-            />
-          }
-
-          <app-destination-selector
-            [destinations]="store.destinations()"
-            [selected]="store.selectedDestination()"
-            [disabled]="store.phase() === 'calculating-route'"
-            (destinationSelected)="store.selectDestination($event)"
-          />
-
-          @if (store.route(); as route) {
-            <app-route-summary [route]="route" (clear)="store.clearRoute()" />
-          }
-        </aside>
-      </div>
+        <button type="submit" class="btn-ghost navigate__go" [disabled]="!manualCode().trim()">Go</button>
+      </form>
+    </app-splash-screen>
+    @if (scannerOpen()) {
+      <app-qr-scanner (scanned)="onScanned($event)" (closed)="scannerOpen.set(false)" />
     }
   }
-</main>
+
+  @case ('resolving-qr') {
+    <app-splash-screen [illustration]="true">
+      <p>Reading your QR code…</p>
+      <div class="navigate__progress"><span></span></div>
+    </app-splash-screen>
+  }
+
+  @case ('loading-venue-data') {
+    <app-splash-screen [illustration]="true">
+      <p>Loading your location…</p>
+      <div class="navigate__progress"><span></span></div>
+    </app-splash-screen>
+  }
+
+  @case ('error') {
+    <app-splash-screen>
+      <span class="mi navigate__error-icon">qr_code_2</span>
+      <p class="navigate__error">{{ store.errorMessage() }}</p>
+      <button type="button" class="btn-primary navigate__wide" (click)="store.retry()">Try again</button>
+      <button type="button" class="btn-ghost navigate__wide" (click)="scanAnother()">Enter a different code</button>
+    </app-splash-screen>
+  }
+
+  @case ('complete') {
+    <app-splash-screen [tagline]="null">
+      <h1 class="navigate__complete-title">You're where you need to be.</h1>
+      <div class="navigate__tiles">
+        <button type="button" (click)="scanAnother()"><span class="mi">qr_code_scanner</span>Scan</button>
+        <button type="button" (click)="findAnother()"><span class="mi">search</span>Find</button>
+        <button type="button" (click)="store.clearRoute()"><span class="mi">near_me</span>Navigate</button>
+      </div>
+      <p class="navigate__footnote">People. Places. Possibilities.</p>
+    </app-splash-screen>
+  }
+
+  @default {
+    <main class="map-screen">
+      <app-floor-plan-viewer
+        class="map-screen__map"
+        [imageUrl]="store.activeFloorImageUrl()"
+        [floorPlan]="store.activeFloorPlan()"
+        [placeholder]="store.activeFloorHasNoPlan() ? 'No map is available for this floor yet.' : 'Loading floor plan…'"
+        [youAreHere]="store.youAreHere()"
+        [youAreHereLabel]="store.phase() === 'ready' ? store.startPoint()?.name ?? null : null"
+        [destination]="destinationPoi()"
+        [routePoints]="store.visibleRoutePoints()"
+        [pois]="pois()"
+        [transitions]="transitions()"
+        [focusMode]="focusMode()"
+        [topInset]="topInset()"
+        [bottomInset]="bottomInset()"
+        (poiSelected)="onPoiSelected($event)"
+        (floorJump)="store.viewFloor($event)"
+      />
+
+      <div class="map-screen__top" #topOverlay>
+        @if (store.phase() === 'navigating' && store.selectedDestination(); as dest) {
+          <header class="nav-header">
+            <span class="place-tile mi nav-header__tile" [style.background]="destinationIcon()?.color">
+              {{ destinationIcon()?.icon }}
+            </span>
+            <div class="nav-header__text">
+              <p class="nav-header__name">{{ dest.name }}</p>
+              <p class="nav-header__meta">
+                {{ store.currentStep()?.anchor?.floorName }}
+                @if (store.steps().length > 1) {
+                  • Part {{ store.stepIndex() + 1 }} of {{ store.steps().length }}
+                }
+                • ~{{ store.currentStep()?.minutesLeft }} min
+              </p>
+            </div>
+            <button type="button" class="btn-danger" (click)="store.endNavigation()">End</button>
+          </header>
+        } @else {
+          <app-top-bar [venueName]="store.venue()?.name ?? null" (find)="openSearch()" (scan)="scanAnother()" />
+        }
+      </div>
+
+      @if (store.floors().length > 1) {
+        <div class="map-screen__floor" [style.top.px]="topInset() + 12">
+          <app-floor-switcher
+            [floors]="store.floors()"
+            [activeFloorId]="store.activeFloorId()"
+            [routeFloorIds]="routeFloorIds()"
+            (floorSelected)="store.viewFloor($event)"
+          />
+        </div>
+      }
+
+      <div class="map-screen__bottom" #bottomOverlay>
+        @if (store.routeError(); as routeError) {
+          <div class="map-screen__toast" role="alert">
+            <span class="mi">error_outline</span>
+            <span>{{ routeError }}</span>
+            <button type="button" aria-label="Dismiss" (click)="store.dismissRouteError()"><span class="mi">close</span></button>
+          </div>
+        }
+
+        @switch (store.phase()) {
+          @case ('ready') {
+            @if (store.venue(); as venue) {
+              <app-location-banner [venue]="venue" [startPoint]="store.startPoint()!" (search)="openSearch()" />
+            }
+          }
+          @case ('calculating-route') {
+            <section class="sheet map-screen__calculating">
+              <div class="map-screen__spinner"></div>
+              <p>Finding the best route to <strong>{{ store.selectedDestination()?.name }}</strong>…</p>
+            </section>
+          }
+          @case ('route-ready') {
+            @if (store.route(); as route) {
+              <app-route-summary
+                [route]="route"
+                [destination]="store.selectedDestination()!"
+                (start)="store.startNavigation()"
+                (clear)="store.clearRoute()"
+              />
+            }
+          }
+          @case ('navigating') {
+            @if (store.currentStep(); as step) {
+              <app-instruction-card
+                [step]="step"
+                [index]="store.stepIndex()"
+                [total]="store.steps().length"
+                (next)="store.nextStep()"
+                (previous)="store.previousStep()"
+              />
+            }
+          }
+          @case ('arrived') {
+            <section class="sheet arrived">
+              <span class="arrived__check mi">check</span>
+              <p class="arrived__title">You've arrived!</p>
+              <p class="arrived__place">{{ store.selectedDestination()?.name }}</p>
+              <p class="arrived__thanks">Thank you for using Areyos.</p>
+              <button type="button" class="btn-primary navigate__wide" (click)="store.finishJourney()">Done</button>
+            </section>
+          }
+        }
+      </div>
+
+      @if (searchOpen()) {
+        <app-destination-selector
+          [destinations]="store.destinations()"
+          [startPoint]="store.startPoint()"
+          (destinationSelected)="chooseDestination($event)"
+          (closed)="searchOpen.set(false)"
+        />
+      }
+    </main>
+  }
+}

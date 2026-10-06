@@ -1,12 +1,14 @@
-<div class="floor-switcher">
-  @for (floor of floors(); track floor.floorId) {
-    <button
-      type="button"
-      class="floor-switcher__tab"
-      [class.floor-switcher__tab--active]="floor.floorId === activeFloorId()"
-      (click)="floorSelected.emit(floor.floorId)"
-    >
-      {{ floor.floorName }}
-    </button>
-  }
-</div>
+<label class="floor-switcher">
+  <span class="mi floor-switcher__icon">layers</span>
+  <select
+    class="floor-switcher__select"
+    aria-label="Floor"
+    [value]="activeFloorId() ?? ''"
+    (change)="onChange($any($event.target).value)"
+  >
+    @for (floor of floors(); track floor.id) {
+      <option [value]="floor.id" [selected]="floor.id === activeFloorId()">{{ label(floor) }}</option>
+    }
+  </select>
+  <span class="mi floor-switcher__chevron">expand_more</span>
+</label>

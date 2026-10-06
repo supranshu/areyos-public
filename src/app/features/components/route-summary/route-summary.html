@@ -1,13 +1,24 @@
-<div class="route-summary">
-  <div class="route-summary__stat">
-    <span class="route-summary__value">{{ route().estimatedTimeMinutes }} min</span>
-    <span class="route-summary__label">Estimated time</span>
+<section class="sheet preview">
+  <div class="preview__head">
+    <span class="place-tile mi" [style.background]="icon().color">{{ icon().icon }}</span>
+    <div class="preview__text">
+      <p class="preview__name">{{ destination().name }}</p>
+      <p class="preview__floor">{{ destination().floorName }}</p>
+      <p class="preview__meta">
+        <span class="mi">schedule</span> ~{{ route().eta }} min walk
+        @if (floorChanges() > 0) {
+          <span class="preview__dot">•</span>
+          <span class="mi">stairs</span> {{ floorChanges() }} floor change{{ floorChanges() === 1 ? '' : 's' }}
+        }
+      </p>
+    </div>
+    <button type="button" class="preview__close" aria-label="Choose a different destination" (click)="clear.emit()">
+      <span class="mi">close</span>
+    </button>
   </div>
-  <div class="route-summary__stat">
-    <span class="route-summary__value">{{ route().totalDistance | number: '1.0-0' }}</span>
-    <span class="route-summary__label">Distance (units)</span>
-  </div>
-  <button class="route-summary__clear-btn" type="button" (click)="clear.emit()">
-    Choose a different destination
+
+  <button type="button" class="btn-primary preview__start" (click)="start.emit()">
+    <span class="mi">navigation</span>
+    Start Navigation
   </button>
-</div>
+</section>

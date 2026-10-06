@@ -1,7 +1,15 @@
-import { Component, computed, input, output, signal } from '@angular/core';
-import { Destination } from '../../navigate/models/navigation.models';
+import { Component, ElementRef, afterNextRender, computed, input, output, signal, viewChild } from '@angular/core';
+import { Destination, StartPoint } from '../../navigate/models/navigation.models';
+import { PlaceIcon, minutesFor, placeIcon } from '../../navigate/models/destination-icons';
 
+interface DestinationRow {
+  destination: Destination;
+  icon: PlaceIcon;
+  /** "Ground floor • ~2 min" — the time is a straight-line estimate, only shown on the visitor's floor. */
+  meta: string;
+}
 
+/** Full-screen destination search (rendered only while open). */
 @Component({
   selector: 'app-destination-selector',
   imports: [],
@@ -10,35 +18,38 @@ import { Destination } from '../../navigate/models/navigation.models';
 })
 export class DestinationSelector {
   readonly destinations = input.required<Destination[]>();
-  readonly selected = input<Destination | null>(null);
-  readonly disabled = input<boolean>(false);
+  readonly startPoint = input<StartPoint | null>(null);
   readonly destinationSelected = output<Destination>();
+  readonly closed = output<void>();
 
-  readonly searchTerm = signal<string>('');
-  readonly isOpen = signal<boolean>(false);
+  readonly searchTerm = signal('');
+  private readonly inputRef = viewChild<ElementRef<HTMLInputElement>>('searchInput');
 
-  readonly filteredDestinations = computed(() => {
+  readonly rows = computed<DestinationRow[]>(() => {
     const term = this.searchTerm().trim().toLowerCase();
-    const list = this.destinations();
-    return term ? list.filter((d) => d.name.toLowerCase().includes(term)) : list;
+    const start = this.startPoint();
+    return this.destinations()
+      .filter((d) => d.nodeId !== start?.nodeId)
+      .filter((d) => !term || d.name.toLowerCase().includes(term) || d.floorName.toLowerCase().includes(term))
+      .map((destination) => {
+        const sameFloor = start && start.floorId === destination.floorId;
+        const minutes = sameFloor
+          ? ` • ~${minutesFor(Math.hypot(destination.x - start.x, destination.y - start.y))} min`
+          : '';
+        return { destination, icon: placeIcon(destination.name), meta: `${destination.floorName}${minutes}` };
+      });
   });
 
-  onSearchChange(value: string): void {
-    this.searchTerm.set(value);
-    this.isOpen.set(true);
+  constructor() {
+    afterNextRender(() => this.inputRef()?.nativeElement.focus());
   }
 
-  onFocus(): void {
-    this.isOpen.set(true);
-  }
-
-  onBlur(): void {
-    setTimeout(() => this.isOpen.set(false), 150);
+  clear(): void {
+    this.searchTerm.set('');
+    this.inputRef()?.nativeElement.focus();
   }
 
   choose(destination: Destination): void {
     this.destinationSelected.emit(destination);
-    this.searchTerm.set('');
-    this.isOpen.set(false);
   }
 }

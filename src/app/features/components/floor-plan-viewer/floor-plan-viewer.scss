@@ -1,26 +1,36 @@
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 .floor-plan-viewer {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: var(--map-bg);
 
   &__placeholder {
+    height: 100%;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    aspect-ratio: 3 / 4;
-    background: var(--paper-tint);
-    border-radius: 12px;
+    gap: 8px;
     color: var(--slate);
+    font-size: 0.9rem;
+
+    .mi {
+      font-size: 40px;
+      opacity: 0.5;
+    }
   }
 
   &__stage {
-    position: relative;
-    width: 100%;
-    border-radius: 12px;
+    position: absolute;
+    inset: 0;
     overflow: hidden;
-    background: var(--paper-tint);
-    // Blocks the browser's native pinch-zoom/pan on this element specifically —
-    // this is what stops the whole page from zooming during a gesture here.
+    // Blocks the browser's native pinch-zoom/pan here so gestures drive the map instead of the page.
     touch-action: none;
     cursor: grab;
 
@@ -32,8 +42,6 @@
   &__canvas {
     position: absolute;
     inset: 0;
-    width: 100%;
-    height: 100%;
     transform-origin: 0 0;
     user-select: none;
   }
@@ -41,9 +49,9 @@
   &__image {
     width: 100%;
     height: 100%;
-    object-fit: contain; // shows the whole image, no cropping
+    object-fit: contain; // whole plan visible; the SVG overlay letterboxes identically ("meet")
     display: block;
-    pointer-events: none; // gestures are handled by the stage, not the img
+    pointer-events: none;
   }
 
   &__overlay {
@@ -55,6 +63,7 @@
     overflow: visible;
   }
 
+  // ---------- route ----------
   &__route-glow,
   &__route-edge,
   &__route-line {
@@ -97,14 +106,12 @@
   &__flow-arrow {
     transform-box: fill-box;
     transform-origin: center;
-    // Opacity, position, rotation, and scale are updated by the route animation.
   }
 
   &__arrow-halo {
     fill: #80aaff;
     opacity: 0.2;
     filter: url('#route-glow-filter');
-    animation: arrow-halo 1.6s ease-in-out infinite;
   }
 
   &__arrow-disc {
@@ -120,161 +127,231 @@
     stroke-width: 0.75;
     stroke-linejoin: round;
   }
-  &__marker {
-    // transform-box lets percentage/center-based CSS transforms work correctly on
-    // an SVG <g>, which is required for the heartbeat scale animation below.
-    transform-box: fill-box;
-    transform-origin: center;
-  }
-
-    &__marker-ring {
-    fill: none;
-    stroke-width: 3;
-    transform-box: fill-box;
-    transform-origin: center;
-    animation: heartbeat-ring 2.8s cubic-bezier(0.2, 0.7, 0.3, 1) infinite;
-
-    &--start {
-      stroke: var(--brand-blue);
-    }
-
-    &--destination {
-      stroke: #1a9c5f;
-    }
-
-    &--secondary {
-      animation-delay: 1.35s;
-      opacity: 0;
-    }
-  }
-
-
-  &__marker-dot {
-    stroke: var(--paper);
-    stroke-width: 3;
-    transform-box: fill-box;
-    transform-origin: center;
-    animation: heartbeat-dot 2.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-
-    &--start {
-      fill: var(--brand-blue);
-    }
-
-    &--destination {
-      fill: #1a9c5f;
-    }
-  }
 
   &__waypoint {
-    fill: var(--paper);
-    stroke: #1854c8;
-    stroke-width: 3;
-  }
-
-  &__waypoint-ring {
-    fill: #80aaff;
-    opacity: 0.2;
+    fill: #fff;
     stroke: #1854c8;
     stroke-width: 2;
-    animation: waypoint-pulse 2s ease-out infinite;
+    vector-effect: non-scaling-stroke;
   }
 
-  &__start-marker {
-    fill: var(--brand-blue);
-    stroke: var(--paper);
-    stroke-width: 3;
-  }
-
-  &__destination-marker {
-    fill: #1a9c5f;
-    stroke: var(--paper);
-    stroke-width: 3;
-  }
-
-  &__floor-label {
-    font-size: var(--fs-label);
-    color: var(--slate);
-    margin: 0;
-    text-align: center;
-  }
-
-  &__fullscreen-btn {
+  // ---------- HTML markers ----------
+  // Each marker's top-left sits on its anchor; the transform re-centres it and cancels the canvas
+  // rotation/zoom (`--counter`) so it stays upright at a constant size.
+  &__poi,
+  &__pin,
+  &__you {
     position: absolute;
-    top: 12px;
-    right: 12px;
-    width: 40px;
-    height: 40px;
+    z-index: 1;
+  }
+
+  &__poi {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    transform-origin: 50% 15px;
+    transform: translate(-50%, -15px) var(--counter);
+  }
+
+  &__poi-icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
     display: flex;
     align-items: center;
     justify-content: center;
+    color: #fff;
+    font-size: 18px;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 6px rgba(10, 10, 10, 0.25);
+  }
+
+  &__poi-label {
+    max-width: 96px;
+    padding: 1px 6px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.9);
+    color: #1f2937;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.35;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  // Floor-change marker: anchored above the stairs/lift node, like a speech bubble.
+  &__transition {
+    position: absolute;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 10px 5px 7px;
+    border: 2px solid #fff;
+    border-radius: 999px;
+    background: #f39c12;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(10, 10, 10, 0.25);
+    transform-origin: 50% 100%;
+    transform: translate(-50%, calc(-100% - 12px)) var(--counter);
+    animation: transition-bob 1.8s ease-in-out infinite;
+
+    .mi {
+      font-size: 16px;
+    }
+  }
+
+  &__pin {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transform-origin: 50% 100%;
+    transform: translate(-50%, -100%) var(--counter);
+    z-index: 2;
+  }
+
+  &__pin-head {
+    width: 40px;
+    height: 40px;
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 3px solid #fff;
+    box-shadow: 0 6px 14px rgba(10, 10, 10, 0.3);
+    animation: pin-drop 0.5s cubic-bezier(0.3, 1.4, 0.5, 1) both;
+
+    .mi {
+      transform: rotate(45deg);
+      color: #fff;
+      font-size: 20px;
+    }
+  }
+
+  &__pin-label {
+    order: -1;
+    margin-bottom: 8px;
+    padding: 3px 8px;
+    border-radius: 8px;
     background: var(--surface-raised);
     color: var(--ink);
-    border: none;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(10, 10, 10, 0.18);
+  }
+
+  &__you {
+    width: 0;
+    height: 0;
+    transform: var(--counter);
+    z-index: 3;
+  }
+
+  &__you-dot,
+  &__you-pulse {
+    position: absolute;
+    left: 0;
+    top: 0;
     border-radius: 50%;
-    box-shadow: 0 2px 8px rgba(10, 10, 10, 0.16);
+    transform: translate(-50%, -50%);
+  }
+
+  &__you-dot {
+    width: 20px;
+    height: 20px;
+    background: #1854c8;
+    border: 3px solid #fff;
+    box-shadow: 0 2px 8px rgba(24, 84, 200, 0.5);
+  }
+
+  &__you-pulse {
+    width: 20px;
+    height: 20px;
+    background: rgba(24, 84, 200, 0.25);
+    animation: you-pulse 2s ease-out infinite;
+  }
+
+  &__you-callout {
+    position: absolute;
+    left: 18px;
+    top: 0;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    padding: 6px 10px;
+    border-radius: 10px;
+    background: var(--surface-raised);
+    color: var(--ink);
+    box-shadow: 0 4px 14px rgba(10, 10, 10, 0.18);
+    white-space: nowrap;
+    font-size: 12px;
+    line-height: 1.3;
+
+    strong {
+      font-size: 13px;
+    }
+
+    span {
+      color: var(--slate);
+    }
+  }
+
+  &__recenter {
+    position: absolute;
+    right: 16px;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 50%;
+    background: var(--surface-raised);
+    color: var(--brand-blue);
+    box-shadow: 0 4px 12px rgba(10, 10, 10, 0.18);
     cursor: pointer;
-    z-index: 5;
+    z-index: 4;
+    transition: bottom 0.25s ease;
 
     &:active {
       transform: scale(0.94);
     }
   }
-
-  &__reset-btn {
-    position: absolute;
-    bottom: 16px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: var(--surface-raised);
-    color: var(--ink);
-    border: none;
-    border-radius: 999px;
-    padding: 8px 16px;
-    font-size: 0.8rem;
-    font-weight: 500;
-    box-shadow: 0 2px 8px rgba(10, 10, 10, 0.16);
-    cursor: pointer;
-    z-index: 5;
-  }
-
-  &--fullscreen {
-    position: fixed;
-    inset: 0;
-    z-index: 1000;
-    background: var(--ink);
-    display: block;
-
-    .floor-plan-viewer__stage {
-      width: 100vw;
-      height: 100vh;
-      border-radius: 0;
-      background: var(--ink);
-    }
-
-    .floor-plan-viewer__fullscreen-btn {
-      top: max(12px, env(safe-area-inset-top));
-      right: max(12px, env(safe-area-inset-right));
-    }
-
-    .floor-plan-viewer__reset-btn {
-      bottom: max(16px, env(safe-area-inset-bottom));
-    }
-  }
 }
 
-@keyframes heartbeat-ring {
-  0% { transform: scale(1); opacity: 0.6; }
-  25% { transform: scale(1.9); opacity: 0; }
-  50% { transform: scale(1); opacity: 0; }
-  60% { transform: scale(1.5); opacity: 0.4; }
-  85% { transform: scale(2.3); opacity: 0; }
-  100% { transform: scale(1); opacity: 0; }
+@keyframes you-pulse {
+  0% { transform: translate(-50%, -50%) scale(1); opacity: 0.9; }
+  100% { transform: translate(-50%, -50%) scale(3.2); opacity: 0; }
 }
 
-@keyframes heartbeat-dot {
-  0%, 100% { transform: scale(1); }
-  15% { transform: scale(1.25); }
-  30% { transform: scale(1); }
-  55% { transform: scale(1.15); }
-  70% { transform: scale(1); }
+@keyframes transition-bob {
+  0%, 100% { margin-top: 0; }
+  50% { margin-top: -3px; }
+}
+
+@keyframes pin-drop {
+  from { transform: rotate(-45deg) translate(0, -20px) scale(0.6); opacity: 0; }
+  to { transform: rotate(-45deg) translate(0, 0) scale(1); opacity: 1; }
+}
+
+@keyframes route-breathe {
+  0%, 100% { opacity: 0.18; }
+  50% { opacity: 0.32; }
+}
+
+@keyframes route-sparkle {
+  to { stroke-dashoffset: -35; }
 }

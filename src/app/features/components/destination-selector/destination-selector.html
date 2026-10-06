@@ -1,39 +1,53 @@
-<div class="destination-selector">
-  <label class="destination-selector__label" for="destination-search">Where do you want to go?</label>
-
-  <div class="destination-selector__input-wrap">
-    <input
-      id="destination-search"
-      class="destination-selector__input"
-      type="text"
-      placeholder="Search destinations..."
-      [value]="selected() ? selected()!.name : searchTerm()"
-      [disabled]="disabled()"
-      (input)="onSearchChange($any($event.target).value)"
-      (focus)="onFocus()"
-      (blur)="onBlur()"
-    />
+<section class="search" role="dialog" aria-label="Find a destination">
+  <div class="search__bar">
+    <button type="button" class="search__icon-btn" aria-label="Back" (click)="closed.emit()">
+      <span class="mi">arrow_back</span>
+    </button>
+    <div class="search__field">
+      <span class="mi search__field-icon">search</span>
+      <input
+        #searchInput
+        type="search"
+        class="search__input"
+        placeholder="Where do you want to go?"
+        autocomplete="off"
+        enterkeyhint="search"
+        [value]="searchTerm()"
+        (input)="searchTerm.set($any($event.target).value)"
+        (keydown.escape)="closed.emit()"
+        (keydown.enter)="rows().length === 1 && choose(rows()[0].destination)"
+      />
+      @if (searchTerm()) {
+        <button type="button" class="search__clear" aria-label="Clear search" (click)="clear()">
+          <span class="mi">close</span>
+        </button>
+      }
+    </div>
   </div>
 
-  @if (isOpen() && filteredDestinations().length > 0) {
-    <ul class="destination-selector__list">
-      @for (destination of filteredDestinations(); track destination.nodeId) {
-        <li>
-          <button
-            type="button"
-            class="destination-selector__option"
-            [class.destination-selector__option--active]="selected()?.nodeId === destination.nodeId"
-            (mousedown)="choose(destination)"
-          >
-            <span>{{ destination.name }}</span>
-            <span class="destination-selector__floor">{{ destination.floorName }}</span>
-          </button>
-        </li>
-      }
-    </ul>
-  }
-
-  @if (isOpen() && filteredDestinations().length === 0) {
-    <p class="destination-selector__empty">No destinations match your search.</p>
-  }
-</div>
+  <ul class="search__list">
+    @for (row of rows(); track row.destination.nodeId) {
+      <li>
+        <button type="button" class="search__row" (click)="choose(row.destination)">
+          <span class="search__row-icon mi" [style.color]="row.icon.color" [style.background]="row.icon.color + '1A'">
+            {{ row.icon.icon }}
+          </span>
+          <span class="search__row-text">
+            <span class="search__row-name">{{ row.destination.name }}</span>
+            <span class="search__row-meta">{{ row.meta }}</span>
+          </span>
+          <span class="mi search__row-go">chevron_right</span>
+        </button>
+      </li>
+    } @empty {
+      <li class="search__empty">
+        <span class="mi">search_off</span>
+        @if (searchTerm()) {
+          <p>No places match “{{ searchTerm() }}”.</p>
+        } @else {
+          <p>This venue has no destinations yet.</p>
+        }
+      </li>
+    }
+  </ul>
+</section>

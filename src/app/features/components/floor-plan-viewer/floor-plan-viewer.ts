@@ -6,17 +6,40 @@ import {
   effect,
   inject,
   input,
+  output,
   signal,
   viewChild,
   viewChildren,
 } from '@angular/core';
-import { Destination, FloorPlanMeta, RoutePoint, StartPoint } from '../../navigate/models/navigation.models';
+import { FloorPlanMeta, RoutePoint } from '../../navigate/models/navigation.models';
 
+/** A point on a floor plan, in the plan image's pixel coordinates. */
+export interface MapPoint {
+  floorId: number;
+  x: number;
+  y: number;
+  nodeId?: number;
+}
+
+/** Where the route leaves or enters this floor (stairs / lift / ramp). Tapping it jumps to the other floor. */
+export interface MapTransition extends MapPoint {
+  label: string;
+  icon: string;
+  targetFloorId: number;
+}
+
+/** A tappable place marker (destination) on the map. */
+export interface MapPoi extends MapPoint {
+  nodeId: number;
+  name: string;
+  icon: string;
+  color: string;
+}
 
 const MIN_SCALE = 1;
 const MAX_SCALE = 4;
-const START_FOCUS_SCALE = 2.5;
-const FOCUS_ANIMATION_MS = 1500;
+const FOCUS_SCALE = 2.2;
+const FOCUS_ANIMATION_MS = 1200;
 
 // --- route animation tuning ---
 const ARROW_COUNT = 4;
@@ -31,6 +54,37 @@ function easeOutCubic(t: number): number {
   return 1 - Math.pow(1 - t, 3);
 }
 
+/** Corner radius for the drawn route, as a fraction of the plan's larger side. */
+const CORNER_RADIUS_RATIO = 0.012;
+
+/** Polyline with each interior corner rounded by a quadratic curve (radius capped at half of either leg). */
+function roundedPath(points: { x: number; y: number }[], radius: number): string {
+  if (points.length === 0) return '';
+  let d = `M ${points[0].x},${points[0].y}`;
+  for (let i = 1; i < points.length - 1; i++) {
+    const prev = points[i - 1];
+    const cur = points[i];
+    const next = points[i + 1];
+    const inLen = Math.hypot(cur.x - prev.x, cur.y - prev.y);
+    const outLen = Math.hypot(next.x - cur.x, next.y - cur.y);
+    const r = Math.min(radius, inLen / 2, outLen / 2);
+    if (r < 0.5) {
+      d += ` L ${cur.x},${cur.y}`;
+      continue;
+    }
+    const ax = cur.x - ((cur.x - prev.x) / inLen) * r;
+    const ay = cur.y - ((cur.y - prev.y) / inLen) * r;
+    const bx = cur.x + ((next.x - cur.x) / outLen) * r;
+    const by = cur.y + ((next.y - cur.y) / outLen) * r;
+    d += ` L ${ax},${ay} Q ${cur.x},${cur.y} ${bx},${by}`;
+  }
+  if (points.length > 1) {
+    const last = points[points.length - 1];
+    d += ` L ${last.x},${last.y}`;
+  }
+  return d;
+}
+
 @Component({
   selector: 'app-floor-plan-viewer',
   imports: [],
@@ -42,14 +96,33 @@ export class FloorPlanViewer {
 
   readonly imageUrl = input<string | null>(null);
   readonly floorPlan = input<FloorPlanMeta | null>(null);
-  readonly startPoint = input<StartPoint | null>(null);
-  readonly destination = input<Destination | null>(null);
+  /** Blue "you" dot. Only drawn when it is on the floor being shown. */
+  readonly youAreHere = input<MapPoint | null>(null);
+  /** Optional callout next to the blue dot (e.g. "You are here" + place name). */
+  readonly youAreHereLabel = input<string | null>(null);
+  readonly destination = input<MapPoi | null>(null);
   readonly routePoints = input<RoutePoint[]>([]);
+  readonly pois = input<MapPoi[]>([]);
+  readonly transitions = input<MapTransition[]>([]);
+  /**
+   * How the view frames things when the blue dot or route changes:
+   * - `fit`: show the whole route on this floor (plus the blue dot / destination), north-up
+   * - `follow`: zoom onto the blue dot, rotated so the route ahead points up
+   * - `none`: leave the view alone
+   */
+  readonly focusMode = input<'none' | 'follow' | 'fit'>('none');
+  /** Space covered by overlays (header / bottom sheet), so focusing centers on the visible part. */
+  readonly topInset = input<number>(0);
+  readonly bottomInset = input<number>(0);
+  readonly placeholder = input<string>('Loading floor plan…');
 
-  readonly isFullscreen = signal<boolean>(false);
+  readonly poiSelected = output<number>();
+  readonly floorJump = output<number>();
+
   private readonly stageRef = viewChild<ElementRef<HTMLDivElement>>('stage');
+  private readonly stageSize = signal({ width: 0, height: 0 });
 
-  // --- pan/zoom state (unchanged from before) ---
+  // --- pan/zoom state ---
   private readonly scale = signal(1);
   private readonly rotation = signal(0);
   private readonly translateX = signal(0);
@@ -59,7 +132,12 @@ export class FloorPlanViewer {
     () =>
       `translate(${this.translateX()}px, ${this.translateY()}px) rotate(${this.rotation()}deg) scale(${this.scale()})`
   );
-  readonly isZoomed = computed(() => this.scale() > 1 || this.rotation() !== 0);
+  readonly isZoomed = computed(() => this.scale() > 1.01 || Math.abs(this.rotation()) > 0.5);
+
+  /** Keeps HTML markers upright and at a constant size while the canvas rotates/zooms. */
+  readonly markerCounterTransform = computed(
+    () => `rotate(${-this.rotation()}deg) scale(${1 / this.scale()})`
+  );
 
   private readonly activePointers = new Map<number, { x: number; y: number }>();
   private lastPinchDistance = 0;
@@ -72,34 +150,55 @@ export class FloorPlanViewer {
     return plan ? `0 0 ${plan.width} ${plan.height}` : '0 0 1 1';
   });
 
-  readonly stageAspectRatio = computed(() => {
+  /**
+   * The image is letterboxed inside the stage (object-fit: contain), and the SVG overlay uses
+   * preserveAspectRatio "meet", so both share this mapping from plan pixels to stage pixels.
+   */
+  private readonly contentBox = computed(() => {
     const plan = this.floorPlan();
-    return plan ? `${plan.width} / ${plan.height}` : '3 / 4';
+    const { width, height } = this.stageSize();
+    if (!plan || !width || !height || !plan.width || !plan.height) return null;
+    const k = Math.min(width / plan.width, height / plan.height);
+    return { k, offsetX: (width - plan.width * k) / 2, offsetY: (height - plan.height * k) / 2 };
   });
 
-  readonly startMarkerOnThisFloor = computed(() => {
-    const sp = this.startPoint();
+  toStage(point: { x: number; y: number }): { left: number; top: number } {
+    const box = this.contentBox();
+    if (!box) return { left: 0, top: 0 };
+    return { left: box.offsetX + point.x * box.k, top: box.offsetY + point.y * box.k };
+  }
+
+  private onThisFloor<T extends MapPoint>(point: T | null): T | null {
     const plan = this.floorPlan();
-    return sp && plan && sp.floorId === plan.floorId ? sp : null;
+    return point && plan && point.floorId === plan.floorId ? point : null;
+  }
+
+  readonly youOnThisFloor = computed(() => this.onThisFloor(this.youAreHere()));
+  readonly destinationOnThisFloor = computed(() => this.onThisFloor(this.destination()));
+  readonly poisOnThisFloor = computed(() => {
+    const plan = this.floorPlan();
+    const destinationId = this.destination()?.nodeId;
+    return plan ? this.pois().filter((p) => p.floorId === plan.floorId && p.nodeId !== destinationId) : [];
   });
 
-  readonly destinationMarkerOnThisFloor = computed(() => {
-    const dest = this.destination();
-    const plan = this.floorPlan();
-    return dest && plan && dest.floorId === plan.floorId ? dest : null;
+  readonly waypoints = computed(() => {
+    const you = this.youAreHere()?.nodeId;
+    const destination = this.destination()?.nodeId;
+    return this.routePoints().filter(
+      (p) => !p.bend && p.nodeId !== you && p.nodeId !== destination && p.type !== 'DESTINATION'
+    );
   });
-
-  readonly waypoints = computed(() =>
-    this.routePoints().filter(
-      (p) => p.type !== 'DESTINATION' && p.nodeId !== this.startPoint()?.nodeId
-    )
-  );
 
   // --- route draw + flow animation ---
   readonly pathD = computed(() => {
-    const points = this.routePoints();
-    if (points.length === 0) return '';
-    return points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x},${p.y}`).join(' ');
+    const plan = this.floorPlan();
+    const radius = plan ? Math.max(plan.width, plan.height) * CORNER_RADIUS_RATIO : 0;
+    return roundedPath(this.routePoints(), radius);
+  });
+
+  readonly transitionsOnThisFloor = computed(() => {
+    const plan = this.floorPlan();
+    return plan ? this.transitions().filter((t) => t.floorId === plan.floorId) : [];
   });
 
   private readonly routeLineRef = viewChild<ElementRef<SVGPathElement>>('routeLine');
@@ -114,30 +213,44 @@ export class FloorPlanViewer {
   private lastFrameTime = 0;
 
   constructor() {
-    // Reset zoom whenever the floor changes or fullscreen is toggled.
+    // Track the stage size (it changes with viewport, orientation and when the map first appears).
     effect((onCleanup) => {
+      const stage = this.stageRef()?.nativeElement;
+      if (!stage) return;
+      const observer = new ResizeObserver(([entry]) => {
+        const { width, height } = entry.contentRect;
+        this.stageSize.set({ width, height });
+      });
+      observer.observe(stage);
+      onCleanup(() => observer.disconnect());
+    });
+
+    // Reset the view whenever the floor changes.
+    effect(() => {
       this.floorPlan();
-      this.isFullscreen();
       this.resetView();
-      onCleanup(() => {});
     });
 
-    // Focus the route entry point after a destination produces a visible route
-    // or when switching to another floor of that route.
+    // Re-frame whenever the blue dot, route, floor or available space changes.
     effect(() => {
-      const hasDestination = this.destination() !== null;
-      const routePoints = this.routePoints();
-      const focusPoint = this.startMarkerOnThisFloor() ?? routePoints[0];
-      if (!hasDestination || !focusPoint) return;
-
-      queueMicrotask(() => this.zoomToPoint(focusPoint.x, focusPoint.y, this.routeHeadingRotation()));
+      const mode = this.focusMode();
+      const you = this.youOnThisFloor();
+      const box = this.contentBox();
+      this.routePoints();
+      this.destinationOnThisFloor();
+      this.topInset();
+      this.bottomInset();
+      if (mode === 'none' || !box) return;
+      if (mode === 'fit') {
+        queueMicrotask(() => this.fitToRoute());
+      } else if (you) {
+        queueMicrotask(() => this.zoomToPoint(you.x, you.y, this.routeHeadingRotation(you)));
+      }
     });
 
-    // Restart the draw + flow animation whenever the visible route changes
-    // (new destination selected, or switching to a different floor of the route).
+    // Restart the draw + flow animation whenever the visible route changes.
     effect(() => {
-      this.pathD(); // dependency
-      // wait a frame so the viewChild ref reflects the just-updated `d` attribute
+      this.pathD();
       queueMicrotask(() => this.startRouteAnimation());
     });
 
@@ -145,6 +258,64 @@ export class FloorPlanViewer {
       this.stopRouteAnimation();
       this.stopFocusAnimation();
     });
+  }
+
+  jumpToFloor(event: Event, floorId: number): void {
+    event.stopPropagation();
+    this.floorJump.emit(floorId);
+  }
+
+  selectPoi(event: Event, nodeId: number): void {
+    event.stopPropagation();
+    this.poiSelected.emit(nodeId);
+  }
+
+  /** Recenter button: re-applies the current framing (or focuses the blue dot / whole floor when idle). */
+  recenter(): void {
+    if (this.focusMode() === 'fit') {
+      this.fitToRoute();
+      return;
+    }
+    const you = this.youOnThisFloor();
+    if (you) {
+      this.zoomToPoint(you.x, you.y, this.focusMode() === 'follow' ? this.routeHeadingRotation(you) : 0);
+    } else {
+      this.resetView();
+    }
+  }
+
+  /** Zoom so the route on this floor, the blue dot and the destination all fit in the visible area. */
+  private fitToRoute(): void {
+    const stage = this.stageRef()?.nativeElement;
+    if (!stage || !this.contentBox()) return;
+
+    const targets: { x: number; y: number }[] = [...this.routePoints()];
+    const you = this.youOnThisFloor();
+    const destination = this.destinationOnThisFloor();
+    if (you) targets.push(you);
+    if (destination) targets.push(destination);
+    if (targets.length === 0) {
+      this.resetView();
+      return;
+    }
+
+    const stagePoints = targets.map((p) => this.toStage(p));
+    const minX = Math.min(...stagePoints.map((p) => p.left));
+    const maxX = Math.max(...stagePoints.map((p) => p.left));
+    const minY = Math.min(...stagePoints.map((p) => p.top));
+    const maxY = Math.max(...stagePoints.map((p) => p.top));
+
+    const padding = 56; // room for markers and labels around the route
+    const availableW = Math.max(1, stage.clientWidth - padding * 2);
+    const availableH = Math.max(1, stage.clientHeight - this.topInset() - this.bottomInset() - padding * 2);
+    const fit = Math.min(availableW / Math.max(1, maxX - minX), availableH / Math.max(1, maxY - minY));
+    const scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, Math.min(fit, FOCUS_SCALE * 1.4)));
+
+    const centerX = stage.clientWidth / 2;
+    const centerY = this.topInset() + (stage.clientHeight - this.topInset() - this.bottomInset()) / 2;
+    const midX = (minX + maxX) / 2;
+    const midY = (minY + maxY) / 2;
+    this.animateToView(scale, 0, centerX - midX * scale, centerY - midY * scale);
   }
 
   private startRouteAnimation(): void {
@@ -157,36 +328,31 @@ export class FloorPlanViewer {
     this.lastFrameTime = this.drawStartTime;
     this.flowOffset = 0;
 
-    const drawDurationMs = Math.min(
-      MAX_DRAW_MS,
-      Math.max(MIN_DRAW_MS, this.pathLength * DRAW_MS_PER_UNIT)
-    );
+    const drawDurationMs = Math.min(MAX_DRAW_MS, Math.max(MIN_DRAW_MS, this.pathLength * DRAW_MS_PER_UNIT));
 
     const tick = (now: number) => {
       const deltaSec = (now - this.lastFrameTime) / 1000;
       this.lastFrameTime = now;
 
-      const drawElapsed = now - this.drawStartTime;
-      const drawT = Math.min(1, drawElapsed / drawDurationMs);
+      const drawT = Math.min(1, (now - this.drawStartTime) / drawDurationMs);
       const revealLength = easeOutCubic(drawT) * this.pathLength;
 
       // Reveal the path by shrinking the dash-offset toward 0.
       pathEl.style.strokeDasharray = `${this.pathLength}`;
       pathEl.style.strokeDashoffset = `${this.pathLength - revealLength}`;
 
-      // Continuously advance the flow offset so arrows keep moving even
-      // after the line is fully drawn.
-      this.flowOffset = (this.flowOffset + FLOW_SPEED * deltaSec) % this.pathLength;
+      // Keep advancing so arrows keep moving after the line is fully drawn.
+      this.flowOffset = this.pathLength > 0 ? (this.flowOffset + FLOW_SPEED * deltaSec) % this.pathLength : 0;
 
       const arrows = this.arrowRefs();
       const spacing = this.pathLength / ARROW_COUNT;
 
       for (let i = 0; i < arrows.length; i++) {
         const el = arrows[i].nativeElement;
-        const distance = (this.flowOffset + i * spacing) % this.pathLength;
+        const distance = this.pathLength > 0 ? (this.flowOffset + i * spacing) % this.pathLength : 0;
 
-        // Hide arrows that are ahead of how far the line has drawn so far.
-        if (distance > revealLength) {
+        // Hide arrows ahead of how far the line has been drawn so far.
+        if (distance > revealLength || this.pathLength === 0) {
           el.style.opacity = '0';
           continue;
         }
@@ -213,11 +379,7 @@ export class FloorPlanViewer {
     }
   }
 
-  // --- fullscreen + pan/zoom methods (unchanged) ---
-
-  toggleFullscreen(): void {
-    this.isFullscreen.update((v) => !v);
-  }
+  // --- pan/zoom ---
 
   resetView(): void {
     this.stopFocusAnimation();
@@ -229,31 +391,33 @@ export class FloorPlanViewer {
 
   private zoomToPoint(x: number, y: number, rotation: number): void {
     const stage = this.stageRef()?.nativeElement;
-    const plan = this.floorPlan();
-    if (!stage || !plan || stage.clientWidth === 0 || stage.clientHeight === 0) return;
+    if (!stage || stage.clientWidth === 0 || stage.clientHeight === 0 || !this.contentBox()) return;
 
-    const pointX = (x / plan.width) * stage.clientWidth;
-    const pointY = (y / plan.height) * stage.clientHeight;
+    const { left: pointX, top: pointY } = this.toStage({ x, y });
+    // Center of the part of the map that isn't covered by the header / bottom sheet.
+    const centerX = stage.clientWidth / 2;
+    const centerY = this.topInset() + (stage.clientHeight - this.topInset() - this.bottomInset()) / 2;
+
     const angle = (rotation * Math.PI) / 180;
     const cos = Math.cos(angle);
     const sin = Math.sin(angle);
     this.animateToView(
-      START_FOCUS_SCALE,
+      FOCUS_SCALE,
       rotation,
-      stage.clientWidth / 2 - (cos * pointX - sin * pointY) * START_FOCUS_SCALE,
-      stage.clientHeight / 2 - (sin * pointX + cos * pointY) * START_FOCUS_SCALE
+      centerX - (cos * pointX - sin * pointY) * FOCUS_SCALE,
+      centerY - (sin * pointX + cos * pointY) * FOCUS_SCALE
     );
   }
 
-  private routeHeadingRotation(): number {
-    const start = this.startMarkerOnThisFloor();
+  /** Rotation that makes the route leaving `origin` point up the screen. */
+  private routeHeadingRotation(origin: MapPoint): number {
     const points = this.routePoints();
-    const origin = start ?? points[0];
-    if (!origin) return 0;
+    if (points.length === 0) return 0;
 
-    const next = points.find(
-      (point) => Math.hypot(point.x - origin.x, point.y - origin.y) > 0.5
-    );
+    const startIndex = Math.max(0, points.findIndex((p) => p.nodeId === origin.nodeId));
+    const next = points
+      .slice(startIndex)
+      .find((point) => Math.hypot(point.x - origin.x, point.y - origin.y) > 0.5);
     if (!next) return 0;
 
     const heading = (Math.atan2(next.y - origin.y, next.x - origin.x) * 180) / Math.PI;
@@ -271,18 +435,14 @@ export class FloorPlanViewer {
 
     const tick = (now: number) => {
       const progress = Math.min(1, (now - startTime) / FOCUS_ANIMATION_MS);
-      const easedProgress = easeOutCubic(progress);
-      this.scale.set(startScale + (targetScale - startScale) * easedProgress);
-      this.rotation.set(startRotation + rotationDelta * easedProgress);
-      this.translateX.set(startX + (targetX - startX) * easedProgress);
-      this.translateY.set(startY + (targetY - startY) * easedProgress);
+      const eased = easeOutCubic(progress);
+      this.scale.set(startScale + (targetScale - startScale) * eased);
+      this.rotation.set(startRotation + rotationDelta * eased);
+      this.translateX.set(startX + (targetX - startX) * eased);
+      this.translateY.set(startY + (targetY - startY) * eased);
       this.clampTranslate();
 
-      if (progress < 1) {
-        this.focusAnimationFrameId = requestAnimationFrame(tick);
-      } else {
-        this.focusAnimationFrameId = null;
-      }
+      this.focusAnimationFrameId = progress < 1 ? requestAnimationFrame(tick) : null;
     };
 
     this.focusAnimationFrameId = requestAnimationFrame(tick);
@@ -296,8 +456,11 @@ export class FloorPlanViewer {
   }
 
   onPointerDown(event: PointerEvent): void {
+    // Let taps on place markers through as clicks.
+    if ((event.target as HTMLElement).closest('.floor-plan-viewer__poi, .floor-plan-viewer__transition, .floor-plan-viewer__recenter')) return;
+
     this.stopFocusAnimation();
-    (event.target as HTMLElement).setPointerCapture(event.pointerId);
+    this.stageRef()?.nativeElement.setPointerCapture(event.pointerId);
     this.activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
 
     if (this.activePointers.size === 1) {
@@ -340,18 +503,14 @@ export class FloorPlanViewer {
     this.stopFocusAnimation();
     event.preventDefault();
     const rect = this.stageRef()!.nativeElement.getBoundingClientRect();
-    const px = event.clientX - rect.left;
-    const py = event.clientY - rect.top;
     const factor = event.deltaY < 0 ? 1.15 : 1 / 1.15;
-    this.zoomAt(px, py, this.scale() * factor);
+    this.zoomAt(event.clientX - rect.left, event.clientY - rect.top, this.scale() * factor);
   }
 
   onDoubleClick(event: MouseEvent): void {
     this.stopFocusAnimation();
     const rect = this.stageRef()!.nativeElement.getBoundingClientRect();
-    const px = event.clientX - rect.left;
-    const py = event.clientY - rect.top;
-    this.zoomAt(px, py, this.isZoomed() ? 1 : 2.5);
+    this.zoomAt(event.clientX - rect.left, event.clientY - rect.top, this.isZoomed() ? 1 : 2.5);
   }
 
   private handlePinch(): void {
@@ -389,19 +548,15 @@ export class FloorPlanViewer {
   private currentPointerMidpoint(): { x: number; y: number } {
     const [p1, p2] = [...this.activePointers.values()];
     const rect = this.stageRef()!.nativeElement.getBoundingClientRect();
-    return {
-      x: (p1.x + p2.x) / 2 - rect.left,
-      y: (p1.y + p2.y) / 2 - rect.top,
-    };
+    return { x: (p1.x + p2.x) / 2 - rect.left, y: (p1.y + p2.y) / 2 - rect.top };
   }
 
   private normalizedAngleDelta(angle: number): number {
-    return ((angle + 180) % 360 + 360) % 360 - 180;
+    return ((((angle + 180) % 360) + 360) % 360) - 180;
   }
 
   private zoomAt(px: number, py: number, newScale: number): void {
-    const s1 = Math.min(MAX_SCALE, Math.max(MIN_SCALE, newScale));
-    this.transformAt(px, py, s1, this.rotation());
+    this.transformAt(px, py, Math.min(MAX_SCALE, Math.max(MIN_SCALE, newScale)), this.rotation());
   }
 
   private transformAt(px: number, py: number, newScale: number, newRotation: number): void {
@@ -454,12 +609,17 @@ export class FloorPlanViewer {
     const maxContentX = Math.max(...xs);
     const minContentY = Math.min(...ys);
     const maxContentY = Math.max(...ys);
-    const nextX = maxContentX - minContentX >= w
-      ? Math.min(-minContentX, Math.max(w - maxContentX, this.translateX()))
-      : (w - minContentX - maxContentX) / 2;
-    const nextY = maxContentY - minContentY >= h
-      ? Math.min(-minContentY, Math.max(h - maxContentY, this.translateY()))
-      : (h - minContentY - maxContentY) / 2;
+    // Allow panning content out from under the header / bottom sheet.
+    const top = this.topInset();
+    const bottom = this.bottomInset();
+    const nextX =
+      maxContentX - minContentX >= w
+        ? Math.min(-minContentX, Math.max(w - maxContentX, this.translateX()))
+        : (w - minContentX - maxContentX) / 2;
+    const nextY =
+      maxContentY - minContentY >= h
+        ? Math.min(-minContentY + top, Math.max(h - maxContentY - bottom, this.translateY()))
+        : (h - minContentY - maxContentY) / 2;
 
     this.translateX.set(nextX);
     this.translateY.set(nextY);

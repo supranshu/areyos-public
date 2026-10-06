@@ -1,8 +1,17 @@
-<header class="location-banner">
-  <span class="location-banner__venue-name">{{ venue().name }}</span>
-  <div class="location-banner__you-are-here">
-    <span class="location-banner__dot"></span>
-    You are here: {{ startPoint().name }}
-    <span class="location-banner__floor">· {{ startPoint().floorName }}</span>
+<section class="sheet welcome">
+  <div class="welcome__head">
+    <span class="welcome__badge mi">waving_hand</span>
+    <div>
+      <p class="welcome__title">Welcome to {{ venue().name }}</p>
+      <p class="welcome__where">
+        You are at <strong>{{ startPoint().name }}</strong>
+        ({{ startPoint().floorName }}, {{ floorCode(startPoint().floorNumber) }})
+      </p>
+    </div>
   </div>
-</header>
+
+  <button type="button" class="welcome__search" (click)="search.emit()">
+    <span class="mi">search</span>
+    <span>Where do you want to go?</span>
+  </button>
+</section>

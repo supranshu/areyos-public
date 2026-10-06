@@ -1,33 +1,64 @@
-.location-banner {
+.welcome {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px;
-  background: var(--paper);
-  border-bottom: 1px solid var(--hairline);
+  flex-direction: column;
+  gap: 14px;
 
-  &__venue-name {
-    font-size: var(--fs-sub);
-    font-weight: 600;
-    color: var(--ink);
+  &__head {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
   }
 
-  &__you-are-here {
+  &__badge {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
     display: flex;
     align-items: center;
-    gap: 6px;
-    font-size: var(--fs-label);
-    color: var(--body-gray);
+    justify-content: center;
+    border-radius: 12px;
+    background: var(--brand-tint);
+    color: var(--brand-blue);
+    font-size: 20px;
   }
 
-  &__dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--brand-blue);
+  &__title {
+    margin: 0;
+    font-weight: 700;
+    font-size: 1.05rem;
   }
 
-  &__floor {
+  &__where {
+    margin: 2px 0 0;
+    font-size: 0.85rem;
     color: var(--slate);
+
+    strong {
+      color: var(--ink);
+      font-weight: 600;
+    }
+  }
+
+  &__search {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 50px;
+    padding: 0 14px;
+    border: 1.5px solid var(--hairline);
+    border-radius: 14px;
+    background: var(--paper-tint);
+    color: var(--slate);
+    font-size: 0.97rem;
+    text-align: left;
+    cursor: text;
+
+    .mi {
+      color: var(--brand-blue);
+    }
+
+    &:hover {
+      border-color: var(--brand-blue);
+    }
   }
 }

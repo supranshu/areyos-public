@@ -1,0 +1,40 @@
+<div class="scanner" role="dialog" aria-label="Scan a QR code">
+  <video #video class="scanner__video" playsinline muted autoplay></video>
+
+  <header class="scanner__top">
+    <button type="button" class="scanner__close" (click)="close()" aria-label="Close camera">
+      <span class="mi">close</span>
+    </button>
+  </header>
+
+  @switch (state()) {
+    @case ('denied') {
+      <div class="scanner__message">
+        <span class="mi scanner__message-icon">no_photography</span>
+        <p><strong>Camera access is blocked.</strong></p>
+        <p>Allow camera access for this site in your browser settings, then try again — or close this and type the code.</p>
+        <button type="button" class="btn-primary" (click)="start()">Try again</button>
+      </div>
+    }
+    @case ('unavailable') {
+      <div class="scanner__message">
+        <span class="mi scanner__message-icon">videocam_off</span>
+        <p><strong>No camera available.</strong></p>
+        <p>This browser can't open the camera here. Use your phone's camera app to scan the code, or type it in instead.</p>
+        <button type="button" class="btn-primary" (click)="close()">Enter the code</button>
+      </div>
+    }
+    @default {
+      <div class="scanner__frame" [class.scanner__frame--live]="state() !== 'starting'">
+        <span></span><span></span><span></span><span></span>
+      </div>
+      <p class="scanner__hint">
+        @switch (state()) {
+          @case ('starting') { Opening camera… }
+          @case ('invalid') { That isn't an Areyos code. Try the one on the sign. }
+          @default { Point at the Areyos QR code }
+        }
+      </p>
+    }
+  }
+</div>

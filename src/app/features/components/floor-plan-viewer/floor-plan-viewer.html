@@ -1,13 +1,13 @@
-<div class="floor-plan-viewer" [class.floor-plan-viewer--fullscreen]="isFullscreen()">
+<div class="floor-plan-viewer">
   @if (!imageUrl() || !floorPlan()) {
     <div class="floor-plan-viewer__placeholder">
-      <p>Loading floor plan…</p>
+      <span class="mi">map</span>
+      <p>{{ placeholder() }}</p>
     </div>
   } @else {
     <div
       #stage
       class="floor-plan-viewer__stage"
-      [style.aspect-ratio]="isFullscreen() ? null : stageAspectRatio()"
       (pointerdown)="onPointerDown($event)"
       (pointermove)="onPointerMove($event)"
       (pointerup)="onPointerUp($event)"
@@ -23,11 +23,7 @@
           draggable="false"
         />
 
-        <svg
-          class="floor-plan-viewer__overlay"
-          [attr.viewBox]="viewBox()"
-          preserveAspectRatio="xMidYMid meet"
-        >
+        <svg class="floor-plan-viewer__overlay" [attr.viewBox]="viewBox()" preserveAspectRatio="xMidYMid meet">
           <defs>
             <linearGradient id="route-core-gradient" x1="0" y1="0" x2="1" y2="1">
               <stop offset="0%" stop-color="#80AAFF" />
@@ -61,53 +57,84 @@
             }
           }
 
-          @for (point of waypoints(); track point.nodeId) {
-            <circle class="floor-plan-viewer__waypoint-ring" [attr.cx]="point.x" [attr.cy]="point.y" r="13" />
-            <circle class="floor-plan-viewer__waypoint" [attr.cx]="point.x" [attr.cy]="point.y" r="5" />
-          }
-
-          @if (destinationMarkerOnThisFloor(); as dest) {
-            <g class="floor-plan-viewer__marker" [attr.transform]="'translate(' + dest.x + ',' + dest.y + ')'">
-              <circle class="floor-plan-viewer__marker-ring floor-plan-viewer__marker-ring--destination" r="10" />
-              <circle class="floor-plan-viewer__marker-dot floor-plan-viewer__marker-dot--destination" r="9" />
-            </g>
-          }
-
-          @if (startMarkerOnThisFloor(); as start) {
-            <g class="floor-plan-viewer__marker" [attr.transform]="'translate(' + start.x + ',' + start.y + ')'">
-              <circle class="floor-plan-viewer__marker-ring floor-plan-viewer__marker-ring--start" r="10" />
-              <circle class="floor-plan-viewer__marker-dot floor-plan-viewer__marker-dot--start" r="9" />
-            </g>
+          @for (point of waypoints(); track $index) {
+            <circle class="floor-plan-viewer__waypoint" [attr.cx]="point.x" [attr.cy]="point.y" r="4" />
           }
         </svg>
+
+        <!-- HTML markers: positioned in stage pixels, counter-transformed so they stay upright and readable. -->
+        @for (poi of poisOnThisFloor(); track poi.nodeId) {
+          <button
+            type="button"
+            class="floor-plan-viewer__poi"
+            [style.left.px]="toStage(poi).left"
+            [style.top.px]="toStage(poi).top"
+            [style.--counter]="markerCounterTransform()"
+            [attr.aria-label]="'Go to ' + poi.name"
+            (click)="selectPoi($event, poi.nodeId)"
+          >
+            <span class="floor-plan-viewer__poi-icon mi" [style.background]="poi.color">{{ poi.icon }}</span>
+            <span class="floor-plan-viewer__poi-label">{{ poi.name }}</span>
+          </button>
+        }
+
+        @for (t of transitionsOnThisFloor(); track $index) {
+          <button
+            type="button"
+            class="floor-plan-viewer__transition"
+            [style.left.px]="toStage(t).left"
+            [style.top.px]="toStage(t).top"
+            [style.--counter]="markerCounterTransform()"
+            [attr.aria-label]="t.label"
+            (click)="jumpToFloor($event, t.targetFloorId)"
+          >
+            <span class="mi">{{ t.icon }}</span>
+            <span>{{ t.label }}</span>
+          </button>
+        }
+
+        @if (destinationOnThisFloor(); as dest) {
+          <div
+            class="floor-plan-viewer__pin"
+            [style.left.px]="toStage(dest).left"
+            [style.top.px]="toStage(dest).top"
+            [style.--counter]="markerCounterTransform()"
+          >
+            <span class="floor-plan-viewer__pin-head" [style.background]="dest.color">
+              <span class="mi">{{ dest.icon }}</span>
+            </span>
+            <span class="floor-plan-viewer__pin-label">{{ dest.name }}</span>
+          </div>
+        }
+
+        @if (youOnThisFloor(); as you) {
+          <div
+            class="floor-plan-viewer__you"
+            [style.left.px]="toStage(you).left"
+            [style.top.px]="toStage(you).top"
+            [style.--counter]="markerCounterTransform()"
+          >
+            <span class="floor-plan-viewer__you-pulse"></span>
+            <span class="floor-plan-viewer__you-dot"></span>
+            @if (youAreHereLabel()) {
+              <span class="floor-plan-viewer__you-callout">
+                <strong>You are here</strong>
+                <span>{{ youAreHereLabel() }}</span>
+              </span>
+            }
+          </div>
+        }
       </div>
 
       <button
         type="button"
-        class="floor-plan-viewer__fullscreen-btn"
-        [attr.aria-label]="isFullscreen() ? 'Minimize map' : 'Maximize map'"
-        (click)="toggleFullscreen()"
+        class="floor-plan-viewer__recenter"
+        [style.bottom.px]="bottomInset() + 16"
+        aria-label="Recenter map"
+        (click)="recenter()"
       >
-        @if (isFullscreen()) {
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-            <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/>
-          </svg>
-        } @else {
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-            <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
-          </svg>
-        }
+        <span class="mi">{{ youOnThisFloor() ? 'my_location' : 'zoom_out_map' }}</span>
       </button>
-
-      @if (isZoomed()) {
-        <button type="button" class="floor-plan-viewer__reset-btn" (click)="resetView()">
-          Reset zoom
-        </button>
-      }
     </div>
-
-    @if (!isFullscreen()) {
-      <p class="floor-plan-viewer__floor-label">{{ floorPlan()!.floorName }}</p>
-    }
   }
 </div>

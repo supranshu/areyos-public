@@ -1,93 +1,175 @@
-.destination-selector {
-  position: relative;
+.search {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  background: var(--paper);
+  animation: search-in 0.2s ease-out;
 
-  &__label {
-    font-size: var(--fs-label);
-    font-weight: 500;
-    color: var(--ink);
+  &__bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: calc(10px + env(safe-area-inset-top)) 12px 10px;
+    border-bottom: 1px solid var(--hairline);
   }
 
-  &__input-wrap {
-    position: relative;
+  &__icon-btn {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 12px;
+    background: none;
+    color: var(--ink);
+    cursor: pointer;
+  }
+
+  &__field {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 46px;
+    padding: 0 8px 0 12px;
+    border-radius: 14px;
+    background: var(--paper-tint);
+    border: 1.5px solid transparent;
+
+    &:focus-within {
+      border-color: var(--brand-blue);
+      background: var(--paper);
+    }
+  }
+
+  &__field-icon {
+    color: var(--slate);
+    font-size: 20px;
   }
 
   &__input {
-    width: 100%;
-    border: 1px solid var(--hairline);
-    border-radius: 8px;
-    padding: 12px 14px;
-    font-family: inherit;
-    font-size: 0.95rem;
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: transparent;
     color: var(--ink);
+    font-size: 1rem;
     outline: none;
 
-    &:focus {
-      border-color: var(--brand-blue);
+    &::-webkit-search-cancel-button {
+      display: none;
     }
+  }
 
-    &:disabled {
-      background: var(--paper-tint);
-      cursor: not-allowed;
+  &__clear {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 50%;
+    background: var(--hairline);
+    color: var(--ink);
+    cursor: pointer;
+
+    .mi {
+      font-size: 16px;
     }
   }
 
   &__list {
-    position: absolute;
-    top: calc(100% + 4px);
-    left: 0;
-    right: 0;
-    background: var(--paper);
-    border: 1px solid var(--hairline);
-    border-radius: 8px;
-    box-shadow: 0 4px 16px rgba(10, 10, 10, 0.08);
-    max-height: 260px;
+    flex: 1;
     overflow-y: auto;
     list-style: none;
     margin: 0;
-    padding: 6px;
-    z-index: 20;
+    padding: 8px 8px calc(16px + env(safe-area-inset-bottom));
   }
 
-  &__option {
+  &__row {
     width: 100%;
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: 14px;
+    padding: 12px 10px;
+    border: 0;
+    border-radius: 14px;
     background: none;
-    border: none;
-    text-align: left;
-    padding: 10px 12px;
-    border-radius: 6px;
-    font-size: 0.9rem;
     color: var(--ink);
+    text-align: left;
     cursor: pointer;
 
     &:hover,
-    &--active {
+    &:focus-visible {
       background: var(--paper-tint);
-      color: var(--brand-blue);
+      outline: none;
     }
   }
 
-  &__floor {
-    font-size: 0.75rem;
+  &__row-icon {
+    width: 42px;
+    height: 42px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    font-size: 22px;
+  }
+
+  &__row-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  &__row-name {
+    font-weight: 600;
+    font-size: 0.97rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__row-meta {
+    font-size: 0.8rem;
     color: var(--slate);
   }
 
-  &__empty {
-    position: absolute;
-    top: calc(100% + 4px);
-    left: 0;
-    right: 0;
-    background: var(--paper);
-    border: 1px solid var(--hairline);
-    border-radius: 8px;
-    padding: 12px;
-    font-size: 0.85rem;
+  &__row-go {
     color: var(--slate);
-    margin: 0;
+    font-size: 20px;
+  }
+
+  &__empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 48px 16px;
+    color: var(--slate);
+    text-align: center;
+
+    .mi {
+      font-size: 36px;
+      opacity: 0.6;
+    }
+
+    p {
+      margin: 0;
+    }
+  }
+}
+
+@keyframes search-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
   }
 }

@@ -1,21 +1,47 @@
 .floor-switcher {
-  display: flex;
-  gap: 8px;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px 0 12px;
+  height: 40px;
+  border-radius: 999px;
+  background: var(--surface-raised);
+  color: var(--ink);
+  box-shadow: 0 4px 14px rgba(10, 10, 10, 0.14);
+  border: 1px solid var(--hairline);
+  cursor: pointer;
 
-  &__tab {
-    flex: 1;
-    padding: 8px 0;
-    border: 1px solid var(--hairline);
-    background: var(--paper);
-    border-radius: 8px;
+  &__icon {
+    font-size: 18px;
+    color: var(--brand-blue);
+  }
+
+  &__select {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: inherit;
     font-size: 0.85rem;
-    color: var(--body-gray);
+    font-weight: 600;
+    padding-right: 4px;
     cursor: pointer;
+    outline: none;
+    max-width: 52vw;
+    text-overflow: ellipsis;
 
-    &--active {
-      border-color: var(--brand-blue);
-      color: var(--brand-blue);
-      font-weight: 500;
+    option {
+      color: #0a0a0a;
     }
+  }
+
+  &__chevron {
+    font-size: 18px;
+    color: var(--slate);
+    pointer-events: none;
+  }
+
+  &:focus-within {
+    border-color: var(--brand-blue);
   }
 }
