@@ -1,25 +1,40 @@
-<div class="scanner" role="dialog" aria-label="Scan a QR code">
+<div class="scanner" role="dialog" aria-modal="true" aria-label="Scan a QR code">
   <video #video class="scanner__video" playsinline muted autoplay></video>
 
   <header class="scanner__top">
-    <button type="button" class="scanner__close" (click)="close()" aria-label="Close camera">
+    <button type="button" class="scanner__round" (click)="close()" aria-label="Close camera">
       <span class="mi">close</span>
     </button>
+    <p class="scanner__title">Scan QR code</p>
+    @if (torchAvailable()) {
+      <button
+        type="button"
+        class="scanner__round"
+        [class.scanner__round--on]="torchOn()"
+        [attr.aria-pressed]="torchOn()"
+        aria-label="Flashlight"
+        (click)="toggleTorch()"
+      >
+        <span class="mi" [class.mi--fill]="torchOn()">{{ torchOn() ? 'flashlight_on' : 'flashlight_off' }}</span>
+      </button>
+    } @else {
+      <span class="scanner__spacer"></span>
+    }
   </header>
 
   @switch (state()) {
     @case ('denied') {
       <div class="scanner__message">
         <span class="mi scanner__message-icon">no_photography</span>
-        <p><strong>Camera access is blocked.</strong></p>
-        <p>Allow camera access for this site in your browser settings, then try again — or close this and type the code.</p>
+        <p class="scanner__message-title">Camera access is blocked</p>
+        <p>Allow camera access for this site in your browser settings and try again, or close this and type the code.</p>
         <button type="button" class="btn-primary" (click)="start()">Try again</button>
       </div>
     }
     @case ('unavailable') {
       <div class="scanner__message">
         <span class="mi scanner__message-icon">videocam_off</span>
-        <p><strong>No camera available.</strong></p>
+        <p class="scanner__message-title">No camera available</p>
         <p>This browser can't open the camera here. Use your phone's camera app to scan the code, or type it in instead.</p>
         <button type="button" class="btn-primary" (click)="close()">Enter the code</button>
       </div>
@@ -27,8 +42,11 @@
     @default {
       <div class="scanner__frame" [class.scanner__frame--live]="state() !== 'starting'">
         <span></span><span></span><span></span><span></span>
+        @if (state() !== 'starting') {
+          <i class="scanner__line" aria-hidden="true"></i>
+        }
       </div>
-      <p class="scanner__hint">
+      <p class="scanner__hint" [class.scanner__hint--warn]="state() === 'invalid'" aria-live="polite">
         @switch (state()) {
           @case ('starting') { Opening camera… }
           @case ('invalid') { That isn't an Areyos code. Try the one on the sign. }

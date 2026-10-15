@@ -1,24 +1,39 @@
-<section class="sheet preview">
+<section class="sheet glass preview">
   <div class="preview__head">
-    <span class="place-tile mi" [style.background]="icon().color">{{ icon().icon }}</span>
+    <span class="place-tile mi mi--fill" [style.background]="icon().color">{{ icon().icon }}</span>
     <div class="preview__text">
-      <p class="preview__name">{{ destination().name }}</p>
+      <p class="eyebrow">Destination</p>
+      <h2 class="preview__name">{{ destination().name }}</h2>
       <p class="preview__floor">{{ destination().floorName }}</p>
-      <p class="preview__meta">
-        <span class="mi">schedule</span> ~{{ route().eta }} min walk
-        @if (floorChanges() > 0) {
-          <span class="preview__dot">•</span>
-          <span class="mi">stairs</span> {{ floorChanges() }} floor change{{ floorChanges() === 1 ? '' : 's' }}
-        }
-      </p>
     </div>
-    <button type="button" class="preview__close" aria-label="Choose a different destination" (click)="clear.emit()">
+    <button type="button" class="icon-btn preview__close" aria-label="Choose a different destination" (click)="clear.emit()">
       <span class="mi">close</span>
     </button>
   </div>
 
+  <dl class="preview__stats">
+    <div>
+      <dt class="eyebrow">Walk</dt>
+      <dd><span class="mono">{{ route().eta }}</span> min</dd>
+    </div>
+    <div>
+      <dt class="eyebrow">Floors</dt>
+      <dd>
+        @if (floorChanges() === 0) {
+          Same floor
+        } @else {
+          <span class="mono">{{ floorChanges() }}</span> change{{ floorChanges() === 1 ? '' : 's' }}
+        }
+      </dd>
+    </div>
+    <div>
+      <dt class="eyebrow">Arrive</dt>
+      <dd class="preview__time">{{ arrival() }}</dd>
+    </div>
+  </dl>
+
   <button type="button" class="btn-primary preview__start" (click)="start.emit()">
-    <span class="mi">navigation</span>
-    Start Navigation
+    <span class="mi mi--fill">navigation</span>
+    Start navigation
   </button>
 </section>

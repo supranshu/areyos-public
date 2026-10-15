@@ -5,11 +5,18 @@ import { PlaceIcon, minutesFor, placeIcon } from '../../navigate/models/destinat
 interface DestinationRow {
   destination: Destination;
   icon: PlaceIcon;
-  /** "Ground floor • ~2 min" — the time is a straight-line estimate, only shown on the visitor's floor. */
-  meta: string;
+  /** Straight-line walking estimate; only known on the visitor's own floor. */
+  minutes: number | null;
 }
 
-/** Full-screen destination search (rendered only while open). */
+interface FloorGroup {
+  floorId: number;
+  floorName: string;
+  isHere: boolean;
+  rows: DestinationRow[];
+}
+
+/** Full-screen destination search (rendered only while open). Results are grouped by floor, visitor's floor first. */
 @Component({
   selector: 'app-destination-selector',
   imports: [],
@@ -25,20 +32,36 @@ export class DestinationSelector {
   readonly searchTerm = signal('');
   private readonly inputRef = viewChild<ElementRef<HTMLInputElement>>('searchInput');
 
-  readonly rows = computed<DestinationRow[]>(() => {
+  readonly groups = computed<FloorGroup[]>(() => {
     const term = this.searchTerm().trim().toLowerCase();
     const start = this.startPoint();
-    return this.destinations()
-      .filter((d) => d.nodeId !== start?.nodeId)
-      .filter((d) => !term || d.name.toLowerCase().includes(term) || d.floorName.toLowerCase().includes(term))
-      .map((destination) => {
-        const sameFloor = start && start.floorId === destination.floorId;
-        const minutes = sameFloor
-          ? ` • ~${minutesFor(Math.hypot(destination.x - start.x, destination.y - start.y))} min`
-          : '';
-        return { destination, icon: placeIcon(destination.name), meta: `${destination.floorName}${minutes}` };
+    const groups = new Map<number, FloorGroup>();
+
+    for (const destination of this.destinations()) {
+      if (destination.nodeId === start?.nodeId) continue;
+      if (term && !destination.name.toLowerCase().includes(term) && !destination.floorName.toLowerCase().includes(term)) {
+        continue;
+      }
+      const isHere = start?.floorId === destination.floorId;
+      let group = groups.get(destination.floorId);
+      if (!group) {
+        group = { floorId: destination.floorId, floorName: destination.floorName, isHere, rows: [] };
+        groups.set(destination.floorId, group);
+      }
+      group.rows.push({
+        destination,
+        icon: placeIcon(destination.name),
+        minutes: isHere && start ? minutesFor(Math.hypot(destination.x - start.x, destination.y - start.y)) : null,
       });
+    }
+
+    for (const group of groups.values()) {
+      group.rows.sort((a, b) => (a.minutes ?? 0) - (b.minutes ?? 0) || a.destination.name.localeCompare(b.destination.name));
+    }
+    return [...groups.values()].sort((a, b) => Number(b.isHere) - Number(a.isHere));
   });
+
+  readonly resultCount = computed(() => this.groups().reduce((n, g) => n + g.rows.length, 0));
 
   constructor() {
     afterNextRender(() => this.inputRef()?.nativeElement.focus());
@@ -47,6 +70,12 @@ export class DestinationSelector {
   clear(): void {
     this.searchTerm.set('');
     this.inputRef()?.nativeElement.focus();
+  }
+
+  /** Enter picks the result when the search narrows to exactly one place. */
+  chooseOnlyResult(): void {
+    const groups = this.groups();
+    if (this.resultCount() === 1) this.choose(groups[0].rows[0].destination);
   }
 
   choose(destination: Destination): void {

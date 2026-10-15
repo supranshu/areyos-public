@@ -14,6 +14,7 @@ import { TopBar } from '../components/top-bar/top-bar';
 import { SplashScreen } from '../components/splash-screen/splash-screen';
 import { InstructionCard } from '../components/instruction-card/instruction-card';
 import { QrScanner } from '../components/qr-scanner/qr-scanner';
+import { HomeScreen } from '../components/home-screen/home-screen';
 
 const DESKTOP_QUERY = '(min-width: 860px)';
 
@@ -29,6 +30,7 @@ const DESKTOP_QUERY = '(min-width: 860px)';
     SplashScreen,
     InstructionCard,
     QrScanner,
+    HomeScreen,
   ],
   providers: [NavigationStore], // fresh state per page instance/visit
   templateUrl: './navigate.html',
@@ -44,7 +46,6 @@ export class Navigate {
   });
 
   readonly searchOpen = signal(false);
-  readonly manualCode = signal('');
   readonly scannerOpen = signal(false);
 
   // Heights of the overlays above/below the map, so the map can center things in the visible area.
@@ -148,13 +149,11 @@ export class Navigate {
 
   onScanned(code: string): void {
     this.scannerOpen.set(false);
-    this.router.navigate(['/qr', code]);
+    this.openCode(code);
   }
 
-  submitManualCode(event: Event): void {
-    event.preventDefault();
-    const code = this.manualCode().trim();
-    if (code) this.router.navigate(['/qr', code]);
+  openCode(code: string): void {
+    this.router.navigate(['/qr', code]);
   }
 
   private toPoi(d: Destination): MapPoi {

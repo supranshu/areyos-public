@@ -1,47 +1,211 @@
-.floor-switcher {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 10px 0 12px;
-  height: 40px;
-  border-radius: 999px;
-  background: var(--surface-raised);
-  color: var(--ink);
-  box-shadow: 0 4px 14px rgba(10, 10, 10, 0.14);
-  border: 1px solid var(--hairline);
-  cursor: pointer;
+.floors {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 52px;
+  max-height: min(296px, 42dvh);
+  padding: 4px;
+  border-radius: 18px;
+  overflow-y: auto;
+  scrollbar-width: none;
+  animation: floors-in 0.4s var(--ease-out) both;
 
-  &__icon {
-    font-size: 18px;
-    color: var(--brand-blue);
+  &::-webkit-scrollbar {
+    display: none;
   }
 
-  &__select {
-    appearance: none;
+  &__btn {
+    position: relative;
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
     border: 0;
+    border-radius: 14px;
     background: transparent;
-    color: inherit;
-    font-size: 0.85rem;
+    color: var(--ink-2);
+    font-size: 0.9rem;
     font-weight: 600;
-    padding-right: 4px;
     cursor: pointer;
-    outline: none;
-    max-width: 52vw;
-    text-overflow: ellipsis;
+    transition: background-color 0.16s ease, color 0.16s ease, transform 0.16s var(--ease-out);
 
-    option {
-      color: #0a0a0a;
+    &:hover:not(.floors__btn--active) {
+      background: var(--fill-hover);
     }
+
+    &:active {
+      transform: scale(0.94);
+    }
+
+    &--active {
+      background: var(--accent-gradient);
+      color: #fff;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 6px 14px -6px var(--accent-glow);
+    }
+  }
+
+  // Small dot: the current route passes through this floor.
+  &__route {
+    position: absolute;
+    top: 7px;
+    right: 7px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--warn);
+    box-shadow: 0 0 0 2px var(--glass-strong);
+  }
+
+  &__btn--active &__route {
+    background: #fff;
+    box-shadow: none;
+  }
+}
+
+// Compact picker for tall buildings: one button showing the current floor, opening a scrollable list.
+.picker {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  animation: floors-in 0.4s var(--ease-out) both;
+
+  &__toggle {
+    position: relative;
+    width: 52px;
+    height: 64px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    border-radius: 18px;
+    color: var(--ink);
+    cursor: pointer;
+    transition: transform 0.16s var(--ease-out);
+
+    &:active {
+      transform: scale(0.95);
+    }
+
+    // The .floors__route dot reused on the toggle.
+    .floors__route {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--warn);
+      box-shadow: 0 0 0 2px var(--glass-strong);
+    }
+  }
+
+  &__current {
+    font-size: 1rem;
+    font-weight: 650;
+    line-height: 1;
   }
 
   &__chevron {
     font-size: 18px;
-    color: var(--slate);
-    pointer-events: none;
+    color: var(--muted);
   }
 
-  &:focus-within {
-    border-color: var(--brand-blue);
+  &__toggle--open &__chevron {
+    color: var(--accent-ink);
+  }
+
+  &__list {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: min(220px, calc(100vw - 2 * var(--gutter)));
+    max-height: min(340px, 40dvh);
+    margin: 0;
+    padding: 6px;
+    list-style: none;
+    border-radius: 20px;
+    background: var(--glass-strong);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    transform-origin: top right;
+    animation: picker-in 0.22s var(--ease-out) both;
+  }
+
+  &__item {
+    position: relative;
+    width: 100%;
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 12px 0 6px;
+    border: 0;
+    border-radius: 14px;
+    background: transparent;
+    color: var(--ink);
+    font-size: 0.95rem;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 0.16s ease;
+
+    &:hover:not(.picker__item--active) {
+      background: var(--fill-hover);
+    }
+
+    &--active {
+      background: var(--accent-soft);
+      color: var(--accent-ink);
+      font-weight: 600;
+    }
+  }
+
+  &__code {
+    min-width: 36px;
+    height: 36px;
+    padding: 0 6px;
+    display: grid;
+    place-items: center;
+    border-radius: 11px;
+    background: var(--fill);
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+
+  &__item--active &__code {
+    background: var(--accent-gradient);
+    color: #fff;
+  }
+
+  &__name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__route {
+    width: 7px;
+    height: 7px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--warn);
+  }
+}
+
+@keyframes picker-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.96);
+  }
+}
+
+@keyframes floors-in {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
   }
 }

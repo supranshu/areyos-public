@@ -1,117 +1,128 @@
-// ---------- splash screens (idle / loading / error / complete) ----------
-.navigate {
-  &__lead {
-    margin: 0;
+// ---------- status screens (loading / error / journey complete) ----------
+.status {
+  &__title {
+    font-size: 1.6rem;
+    font-weight: 650;
+    line-height: 1.15;
+    letter-spacing: -0.035em;
+    color: var(--ink);
+    text-wrap: balance;
+
+    &--lg {
+      font-size: clamp(1.9rem, 8vw, 2.4rem);
+    }
+  }
+
+  &__text {
+    max-width: 32ch;
     font-size: 1rem;
+    line-height: 1.5;
+    color: var(--ink-2);
+    text-wrap: pretty;
   }
 
-  &__or {
-    margin: 4px 0 0;
-    color: var(--slate);
-    font-size: 0.85rem;
+  &__icon {
+    width: 76px;
+    height: 76px;
+    display: grid;
+    place-items: center;
+    margin-bottom: 8px;
+    border-radius: 26px;
+    font-size: 38px;
+
+    &--danger {
+      background: var(--danger-soft);
+      color: var(--danger);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 18%, transparent);
+    }
   }
 
-  &__go {
-    height: 52px;
-  }
-
-  &__code-form {
+  &__actions {
+    width: 100%;
     display: flex;
-    gap: 8px;
-    width: 100%;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 16px;
 
-    input {
-      flex: 1;
-      min-width: 0;
-      height: 52px;
-      padding: 0 14px;
-      border: 1.5px solid var(--hairline);
-      border-radius: 14px;
-      background: var(--paper-tint);
-      color: var(--ink);
-      font-size: 0.95rem;
-      outline: none;
-
-      &:focus {
-        border-color: var(--brand-blue);
-      }
+    button {
+      width: 100%;
     }
   }
 
-  &__progress {
-    width: 180px;
-    height: 5px;
-    border-radius: 3px;
-    background: var(--brand-tint);
-    overflow: hidden;
+  // Success emblem with a soft ring that ripples out once.
+  &__emblem {
+    position: relative;
+    width: 88px;
+    height: 88px;
+    display: grid;
+    place-items: center;
+    margin-bottom: 12px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #3ddc97, var(--success));
+    color: #fff;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 16px 36px -12px color-mix(in srgb, var(--success) 70%, transparent);
+    animation: pop 0.55s var(--ease-spring) both;
 
-    span {
-      display: block;
-      width: 40%;
-      height: 100%;
-      border-radius: 3px;
-      background: #1854c8;
-      animation: progress-slide 1.2s ease-in-out infinite;
+    &::after {
+      content: '';
+      position: absolute;
+      inset: -1px;
+      border-radius: 50%;
+      border: 2px solid var(--success);
+      animation: ripple 1.4s 0.3s var(--ease-out) both;
     }
-  }
 
-  &__error-icon {
-    font-size: 44px;
-    color: var(--danger);
-  }
-
-  &__error {
-    margin: 0;
-    color: var(--ink);
-    font-size: 1rem;
-  }
-
-  &__wide {
-    width: 100%;
-  }
-
-  &__complete-title {
-    margin: 0;
-    font-size: 1.35rem;
-    color: var(--ink);
+    .mi {
+      font-size: 48px;
+      font-variation-settings: 'FILL' 1, 'wght' 600, 'opsz' 48;
+    }
   }
 
   &__tiles {
+    width: 100%;
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-    width: 100%;
+    gap: 10px;
+    margin-top: 20px;
 
     button {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 8px;
-      padding: 16px 8px;
-      border: 1px solid var(--hairline);
-      border-radius: var(--radius-md);
-      background: var(--surface-raised);
+      gap: 10px;
+      min-height: 104px;
+      padding: 18px 6px 14px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: var(--glass);
+      -webkit-backdrop-filter: blur(16px);
+      backdrop-filter: blur(16px);
+      box-shadow: inset 0 1px 0 var(--glass-edge), var(--shadow-sm);
       color: var(--ink);
       font-size: 0.85rem;
       font-weight: 600;
       cursor: pointer;
-      box-shadow: 0 4px 14px rgba(10, 10, 10, 0.06);
+      transition: transform 0.16s var(--ease-out), border-color 0.16s ease;
 
       .mi {
-        font-size: 28px;
-        color: #1854c8;
+        width: 44px;
+        height: 44px;
+        display: grid;
+        place-items: center;
+        border-radius: 14px;
+        background: var(--accent-soft);
+        color: var(--accent-ink);
+        font-size: 24px;
       }
 
       &:hover {
-        border-color: var(--brand-blue);
+        border-color: var(--line-strong);
+      }
+
+      &:active {
+        transform: scale(0.96);
       }
     }
-  }
-
-  &__footnote {
-    margin: 8px 0 0;
-    font-size: 0.8rem;
-    color: var(--slate);
   }
 }
 
@@ -127,90 +138,126 @@
     inset: 0;
   }
 
-  &__top {
+  // Overlay containers let map gestures through everywhere except on their own cards.
+  &__top,
+  &__bottom,
+  &__floor {
     position: absolute;
+    z-index: 10;
+    pointer-events: none;
+
+    > * {
+      pointer-events: auto;
+    }
+  }
+
+  &__top {
     top: 0;
     left: 0;
     right: 0;
-    z-index: 10;
+    padding: calc(var(--gutter) + var(--safe-top)) var(--gutter) 0;
+
+    @media (min-width: 860px) {
+      right: auto;
+      width: 440px;
+      padding: 20px 20px 0;
+    }
   }
 
   &__floor {
-    position: absolute;
-    left: 16px;
+    right: var(--gutter);
     z-index: 9;
+    transition: top 0.3s var(--ease-out);
+
+    @media (min-width: 860px) {
+      right: 20px;
+    }
   }
 
   &__bottom {
-    position: absolute;
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 10;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
+    padding: 0 var(--gutter) calc(var(--gutter) + var(--safe-bottom));
 
-    // Tablet / desktop: floating panel instead of a full-width bottom sheet.
+    // Tablet / desktop: floating side panel instead of a full-width card.
     @media (min-width: 860px) {
-      left: 20px;
       right: auto;
-      bottom: 20px;
-      width: 400px;
+      width: 440px;
+      padding: 0 20px 20px;
     }
   }
 
   &__toast {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin: 0 12px;
-    padding: 12px 12px 12px 14px;
-    border-radius: 14px;
-    background: var(--danger-tint);
-    color: var(--danger);
-    font-size: 0.88rem;
+    gap: 12px;
+    padding: 8px 6px 8px 16px;
+    border-radius: 20px;
+    color: var(--ink);
+    font-size: 0.9rem;
     font-weight: 500;
-    backdrop-filter: blur(6px);
-    box-shadow: 0 4px 14px rgba(10, 10, 10, 0.12);
+    animation: sheet-up 0.35s var(--ease-out) both;
+
+    > .mi {
+      color: var(--danger);
+    }
 
     span:nth-child(2) {
       flex: 1;
+      line-height: 1.35;
     }
 
-    button {
-      display: flex;
-      border: 0;
-      background: none;
-      color: inherit;
-      cursor: pointer;
-      padding: 2px;
-    }
-
-    @media (min-width: 860px) {
-      margin: 0;
+    .icon-btn .mi {
+      font-size: 20px;
+      color: var(--muted);
     }
   }
+}
 
-  &__calculating {
-    display: flex;
-    align-items: center;
-    gap: 14px;
+// ---------- calculating ----------
+.calculating {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 
-    p {
-      margin: 0;
-      color: var(--body-gray);
-    }
-  }
-
-  &__spinner {
-    width: 28px;
-    height: 28px;
+  &__orbit {
+    position: relative;
+    width: 44px;
+    height: 44px;
     flex-shrink: 0;
-    border: 3px solid var(--brand-tint);
-    border-top-color: #1854c8;
     border-radius: 50%;
-    animation: spin 0.8s linear infinite;
+    background: var(--accent-soft);
+
+    &::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: conic-gradient(from 0deg, transparent 0 60%, var(--accent) 100%);
+      -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px));
+      mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px));
+      animation: spin 0.9s linear infinite;
+    }
+  }
+
+  &__text {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  &__name {
+    font-size: 1.1rem;
+    font-weight: 650;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
 
@@ -219,36 +266,30 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: calc(10px + env(safe-area-inset-top)) 16px 10px;
-  background: var(--surface-raised);
-  box-shadow: 0 1px 0 var(--hairline), 0 4px 16px rgba(10, 10, 10, 0.08);
+  min-height: 64px;
+  padding: 8px 10px 8px 8px;
+  border-radius: var(--radius-lg);
+  animation: header-in 0.4s var(--ease-out) both;
 
   &__tile {
-    width: 40px;
-    height: 40px;
-    border-radius: 12px;
-    font-size: 22px;
+    width: 46px;
+    height: 46px;
+    border-radius: 15px;
+    font-size: 23px;
   }
 
   &__text {
     flex: 1;
     min-width: 0;
-
-    p {
-      margin: 0;
-    }
   }
 
   &__name {
-    font-weight: 700;
+    font-weight: 650;
+    font-size: 1rem;
+    letter-spacing: -0.015em;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-
-  &__meta {
-    font-size: 0.8rem;
-    color: var(--slate);
   }
 }
 
@@ -258,41 +299,46 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 2px;
-
-  p {
-    margin: 0;
-  }
+  gap: 4px;
+  padding-top: 24px;
 
   &__check {
-    width: 52px;
-    height: 52px;
-    margin-bottom: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    width: 64px;
+    height: 64px;
+    display: grid;
+    place-items: center;
+    margin-bottom: 10px;
     border-radius: 50%;
-    background: var(--success);
+    background: linear-gradient(135deg, #3ddc97, var(--success));
     color: #fff;
-    font-size: 32px;
-    animation: pop 0.4s cubic-bezier(0.3, 1.5, 0.5, 1);
+    box-shadow: 0 12px 28px -10px color-mix(in srgb, var(--success) 70%, transparent);
+    animation: pop 0.5s var(--ease-spring) both;
+
+    .mi {
+      font-size: 36px;
+      font-variation-settings: 'FILL' 1, 'wght' 600, 'opsz' 40;
+    }
   }
 
-  &__title {
-    font-size: 1.3rem;
-    font-weight: 700;
+  &__eyebrow {
     color: var(--success);
   }
 
   &__place {
-    font-size: 1.1rem;
-    font-weight: 600;
+    font-size: 1.4rem;
+    font-weight: 650;
+    letter-spacing: -0.03em;
+    line-height: 1.2;
   }
 
   &__thanks {
-    margin: 4px 0 14px !important;
-    color: var(--slate);
-    font-size: 0.9rem;
+    color: var(--muted);
+    font-size: 0.92rem;
+  }
+
+  &__done {
+    width: 100%;
+    margin-top: 16px;
   }
 }
 
@@ -302,18 +348,27 @@
   }
 }
 
-@keyframes progress-slide {
-  0% {
-    transform: translateX(-110%);
-  }
-  100% {
-    transform: translateX(260%);
-  }
-}
-
 @keyframes pop {
   from {
     transform: scale(0.4);
     opacity: 0;
+  }
+}
+
+@keyframes ripple {
+  from {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  to {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+@keyframes header-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
   }
 }

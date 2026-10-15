@@ -1,4 +1,4 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, OnDestroy, computed, inject, signal } from '@angular/core';
 import { Observable, forkJoin, of, tap } from 'rxjs';
 import { VisitorApiService, apiErrorMessage } from '../../../core/services/visitor-api';
 import { PublicFloorResponse } from '../../../core/models/api.models';
@@ -36,7 +36,7 @@ const SESSION_STORAGE_KEY = 'areyos.session';
 // Scoped to the feature (provided per-component, not providedIn: 'root') so
 // every QR scan starts with clean state instead of a stale previous visit.
 @Injectable()
-export class NavigationStore {
+export class NavigationStore implements OnDestroy {
   private readonly api = inject(VisitorApiService);
   /** Code as typed in the URL, for retry. */
   private lastCode: string | null = null;
@@ -62,6 +62,9 @@ export class NavigationStore {
   private readonly _stepIndex = signal(0);
   private readonly _floorPlans = signal<Map<number, FloorPlanMeta>>(new Map());
   private readonly _floorsWithoutPlan = signal<Set<number>>(new Set());
+  /** Floor id → image URL: a blob: URL once downloaded, or the direct URL if the download failed. */
+  private readonly _floorImages = signal<Map<number, string>>(new Map());
+  private readonly loadingImages = new Set<number>();
   private readonly _activeFloorId = signal<number | null>(null);
 
   readonly phase = this._phase.asReadonly();
@@ -84,9 +87,10 @@ export class NavigationStore {
     return floorId != null ? this._floorPlans().get(floorId) ?? null : null;
   });
 
+  /** Null while the image is still downloading, so the viewer keeps its "Loading floor plan…" placeholder. */
   readonly activeFloorImageUrl = computed(() => {
     const plan = this.activeFloorPlan();
-    return plan ? this.api.getFloorPlanImageUrl(plan.floorId) : null;
+    return plan ? this._floorImages().get(plan.floorId) ?? null : null;
   });
 
   readonly activeFloorHasNoPlan = computed(() => {
@@ -145,8 +149,7 @@ export class NavigationStore {
         this._startPoint.set(startPoint);
         this._activeFloorId.set(startPoint.floorId);
         this.qrCode = qr.code;
-        this.resumeOrStartSession(qr.code, venue.id, startPoint.nodeId);
-        this.loadVenueData(venue.id, startPoint.floorId);
+        this.loadVenueData(venue.id, startPoint);
       },
       error: (err) =>
         this.fail(
@@ -294,18 +297,20 @@ export class NavigationStore {
     if (step) this._activeFloorId.set(step.anchor.floorId);
   }
 
-  private loadVenueData(venueId: number, floorId: number): void {
+  private loadVenueData(venueId: number, startPoint: StartPoint): void {
     this._phase.set('loading-venue-data');
 
     forkJoin({
       destinations: this.api.getDestinations(venueId),
       floors: this.api.getFloors(venueId),
-      floorPlan: this.ensureFloorPlanLoaded(floorId),
+      floorPlan: this.ensureFloorPlanLoaded(startPoint.floorId),
     }).subscribe({
       next: ({ destinations, floors }) => {
         this._destinations.set([...destinations].sort((a, b) => a.name.localeCompare(b.name)));
         this._floors.set(floors);
         this._phase.set('ready');
+        // Analytics only, so it waits until the map is up instead of competing with the requests it needs.
+        if (this.qrCode) this.resumeOrStartSession(this.qrCode, venueId, startPoint.nodeId);
       },
       error: () => this.fail('Could not load venue data. Please try again.'),
     });
@@ -320,8 +325,31 @@ export class NavigationStore {
         const next = new Map(this._floorPlans());
         next.set(floorId, meta);
         this._floorPlans.set(next);
+        this.loadFloorImage(floorId);
       })
     );
+  }
+
+  /** Downloads the plan image in the background; the map shows as soon as it arrives. */
+  private loadFloorImage(floorId: number): void {
+    if (this._floorImages().has(floorId) || this.loadingImages.has(floorId)) return;
+    this.loadingImages.add(floorId);
+
+    const settle = (url: string) => {
+      this.loadingImages.delete(floorId);
+      this._floorImages.update((map) => new Map(map).set(floorId, url));
+    };
+    this.api.getFloorPlanImage(floorId).subscribe({
+      next: (blob) => settle(URL.createObjectURL(blob)),
+      // Let the browser try the plain URL itself; it may still succeed (and caches nothing worse).
+      error: () => settle(this.api.getFloorPlanImageUrl(floorId)),
+    });
+  }
+
+  ngOnDestroy(): void {
+    for (const url of this._floorImages().values()) {
+      if (url.startsWith('blob:')) URL.revokeObjectURL(url);
+    }
   }
 
   /**

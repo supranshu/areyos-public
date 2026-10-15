@@ -19,15 +19,15 @@ const RULES: { pattern: RegExp; icon: PlaceIcon }[] = [
   { pattern: /lift|elevator/i, icon: { icon: 'elevator', color: '#5C6BC0' } },
   { pattern: /stair|escalator/i, icon: { icon: 'stairs', color: '#F39C12' } },
   { pattern: /toilet|restroom|washroom|\bwc\b|bathroom/i, icon: { icon: 'wc', color: '#00897B' } },
-  { pattern: /wait|lounge|seat/i, icon: { icon: 'event_seat', color: '#546E7A' } },
-  { pattern: /recep|info|help|desk|counter/i, icon: { icon: 'support_agent', color: '#1854C8' } },
-  { pattern: /entr|exit|gate|door|lobby/i, icon: { icon: 'meeting_room', color: '#1854C8' } },
+  { pattern: /wait|lounge|seat/i, icon: { icon: 'event_seat', color: '#64748B' } },
+  { pattern: /recep|info|help|desk|counter/i, icon: { icon: 'support_agent', color: '#2F6BFF' } },
+  { pattern: /entr|exit|gate|door|lobby/i, icon: { icon: 'meeting_room', color: '#2F6BFF' } },
   { pattern: /park/i, icon: { icon: 'local_parking', color: '#1E88E5' } },
   { pattern: /atm|bank|cash/i, icon: { icon: 'local_atm', color: '#12A150' } },
   { pattern: /shop|store|mart|boutique/i, icon: { icon: 'storefront', color: '#F39C12' } },
 ];
 
-const DEFAULT_ICON: PlaceIcon = { icon: 'place', color: '#1854C8' };
+const DEFAULT_ICON: PlaceIcon = { icon: 'place', color: '#2F6BFF' };
 
 export function placeIcon(name: string): PlaceIcon {
   return RULES.find((rule) => rule.pattern.test(name))?.icon ?? DEFAULT_ICON;

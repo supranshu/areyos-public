@@ -1,14 +1,11 @@
 import { Component, input } from '@angular/core';
 
-/** Areyos "A" logo, optionally with the wordmark and tagline. */
+/** Areyos logo, optionally with the wordmark and a subtitle line. */
 @Component({
   selector: 'app-brand-mark',
   template: `
     <div class="brand" [class.brand--stacked]="stacked()">
-      <svg class="brand__logo" [attr.width]="size()" [attr.height]="size()" viewBox="0 0 48 48" aria-hidden="true">
-        <path d="M24 3 45 44 24 33.5 3 44Z" fill="#1854C8" />
-        <path d="M24 15.5 35.2 37.6 24 32 12.8 37.6Z" fill="#80AAFF" />
-      </svg>
+      <img class="brand__logo" src="logo.png" alt="" [attr.width]="size()" [attr.height]="size()" />
       @if (wordmark()) {
         <div class="brand__text">
           <span class="brand__name">Areyos</span>
@@ -20,6 +17,10 @@ import { Component, input } from '@angular/core';
     </div>
   `,
   styles: `
+    :host {
+      display: block;
+      min-width: 0;
+    }
     .brand {
       display: flex;
       align-items: center;
@@ -28,11 +29,13 @@ import { Component, input } from '@angular/core';
     }
     .brand--stacked {
       flex-direction: column;
-      gap: 6px;
+      gap: 12px;
       text-align: center;
     }
     .brand__logo {
       flex-shrink: 0;
+      border-radius: 24%;
+      box-shadow: 0 8px 20px -8px var(--accent-glow);
     }
     .brand__text {
       display: flex;
@@ -41,23 +44,23 @@ import { Component, input } from '@angular/core';
     }
     .brand__name {
       font-weight: 700;
-      font-size: 1.15rem;
-      letter-spacing: -0.01em;
-      color: var(--brand-blue);
-      line-height: 1.1;
+      font-size: 1.05rem;
+      letter-spacing: -0.03em;
+      color: var(--ink);
+      line-height: 1.15;
     }
     .brand--stacked .brand__name {
-      font-size: 1.9rem;
+      font-size: 1.6rem;
     }
     .brand__subtitle {
-      font-size: 0.75rem;
-      color: var(--slate);
+      font-size: 0.78rem;
+      color: var(--muted);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
     .brand--stacked .brand__subtitle {
-      font-size: 0.85rem;
+      font-size: 0.9rem;
       white-space: normal;
     }
   `,

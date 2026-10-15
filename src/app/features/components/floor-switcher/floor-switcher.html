@@ -1,14 +1,61 @@
-<label class="floor-switcher">
-  <span class="mi floor-switcher__icon">layers</span>
-  <select
-    class="floor-switcher__select"
-    aria-label="Floor"
-    [value]="activeFloorId() ?? ''"
-    (change)="onChange($any($event.target).value)"
-  >
-    @for (floor of floors(); track floor.id) {
-      <option [value]="floor.id" [selected]="floor.id === activeFloorId()">{{ label(floor) }}</option>
+@if (!compact()) {
+  <nav class="floors glass" aria-label="Floors">
+    @for (floor of sortedFloors(); track floor.id) {
+      <button
+        type="button"
+        class="floors__btn mono"
+        [class.floors__btn--active]="floor.id === activeFloorId()"
+        [attr.aria-pressed]="floor.id === activeFloorId()"
+        [attr.aria-label]="ariaLabel(floor)"
+        [title]="floor.name"
+        (click)="floorSelected.emit(floor.id)"
+      >
+        {{ code(floor) }}
+        @if (routeFloorIds().includes(floor.id)) {
+          <span class="floors__route" aria-hidden="true"></span>
+        }
+      </button>
     }
-  </select>
-  <span class="mi floor-switcher__chevron">expand_more</span>
-</label>
+  </nav>
+} @else {
+  <nav class="picker" aria-label="Floors">
+    <button
+      type="button"
+      class="picker__toggle glass"
+      [class.picker__toggle--open]="open()"
+      [attr.aria-expanded]="open()"
+      aria-controls="floor-list"
+      [attr.aria-label]="'Change floor. Showing ' + (activeFloor()?.name ?? 'no floor')"
+      (click)="open.set(!open())"
+    >
+      <span class="picker__current mono">{{ activeFloor() ? code(activeFloor()!) : '–' }}</span>
+      <span class="mi picker__chevron" aria-hidden="true">{{ open() ? 'close' : 'unfold_more' }}</span>
+      @if (routeElsewhere() && !open()) {
+        <span class="floors__route" aria-hidden="true"></span>
+      }
+    </button>
+
+    @if (open()) {
+      <ul #list id="floor-list" class="picker__list glass">
+        @for (floor of sortedFloors(); track floor.id) {
+          <li>
+            <button
+              type="button"
+              class="picker__item"
+              [class.picker__item--active]="floor.id === activeFloorId()"
+              [attr.aria-current]="floor.id === activeFloorId()"
+              [attr.aria-label]="ariaLabel(floor)"
+              (click)="select(floor)"
+            >
+              <span class="picker__code mono">{{ code(floor) }}</span>
+              <span class="picker__name">{{ floor.name }}</span>
+              @if (routeFloorIds().includes(floor.id)) {
+                <span class="picker__route" aria-hidden="true"></span>
+              }
+            </button>
+          </li>
+        }
+      </ul>
+    }
+  </nav>
+}

@@ -126,15 +126,20 @@
         }
       </div>
 
-      <button
-        type="button"
-        class="floor-plan-viewer__recenter"
-        [style.bottom.px]="bottomInset() + 16"
-        aria-label="Recenter map"
-        (click)="recenter()"
-      >
-        <span class="mi">{{ youOnThisFloor() ? 'my_location' : 'zoom_out_map' }}</span>
-      </button>
+      <div class="floor-plan-viewer__controls" [style.bottom.px]="bottomInset() + 16">
+        @if (youOnThisFloor()) {
+          <button type="button" class="floor-plan-viewer__control" aria-label="Show whole floor" title="Show whole floor" (click)="resetZoom()">
+            <span class="mi">zoom_out_map</span>
+          </button>
+          <button type="button" class="floor-plan-viewer__control" aria-label="Recenter map" title="Recenter map" (click)="recenter()">
+            <span class="mi">my_location</span>
+          </button>
+        } @else {
+          <button type="button" class="floor-plan-viewer__control" aria-label="Reset view" title="Reset view" (click)="recenter()">
+            <span class="mi">zoom_out_map</span>
+          </button>
+        }
+      </div>
     </div>
   }
 </div>

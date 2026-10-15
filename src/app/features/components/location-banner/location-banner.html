@@ -1,17 +1,51 @@
-<section class="sheet welcome">
-  <div class="welcome__head">
-    <span class="welcome__badge mi">waving_hand</span>
-    <div>
-      <p class="welcome__title">Welcome to {{ venue().name }}</p>
-      <p class="welcome__where">
-        You are at <strong>{{ startPoint().name }}</strong>
-        ({{ startPoint().floorName }}, {{ floorCode(startPoint().floorNumber) }})
-      </p>
+<section class="sheet glass here" [class.here--collapsed]="collapsed()">
+  <button
+    type="button"
+    class="here__handle"
+    [attr.aria-expanded]="!collapsed()"
+    [attr.aria-label]="collapsed() ? 'Show details' : 'Hide details'"
+    (click)="toggle()"
+    (pointerdown)="onHandleDown($event)"
+    (pointerup)="onHandleUp($event)"
+  >
+    <span class="here__grip" aria-hidden="true"></span>
+  </button>
+
+  <div class="here__fold" [attr.inert]="collapsed() ? '' : null">
+    <div class="here__fold-inner">
+      <div class="here__head">
+        <p class="eyebrow here__eyebrow"><span class="live-dot"></span>You are here</p>
+        <h2 class="here__name">{{ startPoint().name }}</h2>
+        <p class="here__meta">
+          <span class="here__code mono">{{ floorCode(startPoint().floorNumber) }}</span>
+          {{ startPoint().floorName }}
+        </p>
+      </div>
     </div>
   </div>
 
-  <button type="button" class="welcome__search" (click)="search.emit()">
+  <button type="button" class="here__search" (click)="search.emit()">
     <span class="mi">search</span>
-    <span>Where do you want to go?</span>
+    <span class="here__search-text">Where do you want to go?</span>
   </button>
+
+  @if (picks().length) {
+    <div class="here__fold here__fold--bleed" [attr.inert]="collapsed() ? '' : null">
+      <div class="here__fold-inner">
+        <div class="here__picks" role="group" aria-label="Quick destinations">
+          @for (pick of picks(); track pick.destination.nodeId) {
+            <button
+              type="button"
+              class="here__pick"
+              [attr.aria-label]="pick.label === pick.destination.name ? pick.label : 'Nearest ' + pick.label + ': ' + pick.destination.name"
+              (click)="destinationSelected.emit(pick.destination)"
+            >
+              <span class="mi mi--fill" [style.color]="pick.icon.color">{{ pick.icon.icon }}</span>
+              <span class="here__pick-label">{{ pick.label }}</span>
+            </button>
+          }
+        </div>
+      </div>
+    </div>
+  }
 </section>

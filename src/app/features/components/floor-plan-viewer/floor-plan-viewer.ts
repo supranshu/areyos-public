@@ -8,6 +8,7 @@ import {
   input,
   output,
   signal,
+  untracked,
   viewChild,
   viewChildren,
 } from '@angular/core';
@@ -162,6 +163,21 @@ export class FloorPlanViewer {
     return { k, offsetX: (width - plan.width * k) / 2, offsetY: (height - plan.height * k) / 2 };
   });
 
+  /**
+   * Vertical offset of the unzoomed view: moves the plan from the middle of the screen to the middle of the
+   * part not covered by the top bar / bottom sheet, without pushing its top edge under the top bar.
+   */
+  private readonly homeOffsetY = computed(() => {
+    const box = this.contentBox();
+    const plan = this.floorPlan();
+    const { height } = this.stageSize();
+    if (!box || !plan) return 0;
+    const top = this.topInset();
+    const visibleCenter = top + (height - top - this.bottomInset()) / 2;
+    const raise = visibleCenter - height / 2;
+    return Math.max(raise, Math.min(0, top - box.offsetY));
+  });
+
   toStage(point: { x: number; y: number }): { left: number; top: number } {
     const box = this.contentBox();
     if (!box) return { left: 0, top: 0 };
@@ -231,6 +247,14 @@ export class FloorPlanViewer {
       this.resetView();
     });
 
+    // Keep the unzoomed view centered in the visible area as the stage or overlays resize (e.g. sheet collapsed).
+    effect(() => {
+      const offsetY = this.homeOffsetY();
+      if (untracked(this.isZoomed)) return;
+      this.translateX.set(0);
+      this.translateY.set(offsetY);
+    });
+
     // Re-frame whenever the blue dot, route, floor or available space changes.
     effect(() => {
       const mode = this.focusMode();
@@ -280,7 +304,7 @@ export class FloorPlanViewer {
     if (you) {
       this.zoomToPoint(you.x, you.y, this.focusMode() === 'follow' ? this.routeHeadingRotation(you) : 0);
     } else {
-      this.resetView();
+      this.resetZoom();
     }
   }
 
@@ -306,13 +330,14 @@ export class FloorPlanViewer {
     const maxY = Math.max(...stagePoints.map((p) => p.top));
 
     const padding = 56; // room for markers and labels around the route
+    const extraTop = 40; // floor-change bubbles sit above their node
     const availableW = Math.max(1, stage.clientWidth - padding * 2);
-    const availableH = Math.max(1, stage.clientHeight - this.topInset() - this.bottomInset() - padding * 2);
+    const availableH = Math.max(1, stage.clientHeight - this.topInset() - this.bottomInset() - padding * 2 - extraTop);
     const fit = Math.min(availableW / Math.max(1, maxX - minX), availableH / Math.max(1, maxY - minY));
     const scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, Math.min(fit, FOCUS_SCALE * 1.4)));
 
     const centerX = stage.clientWidth / 2;
-    const centerY = this.topInset() + (stage.clientHeight - this.topInset() - this.bottomInset()) / 2;
+    const centerY = this.topInset() + extraTop / 2 + (stage.clientHeight - this.topInset() - this.bottomInset() - extraTop) / 2;
     const midX = (minX + maxX) / 2;
     const midY = (minY + maxY) / 2;
     this.animateToView(scale, 0, centerX - midX * scale, centerY - midY * scale);
@@ -328,7 +353,13 @@ export class FloorPlanViewer {
     this.lastFrameTime = this.drawStartTime;
     this.flowOffset = 0;
 
-    const drawDurationMs = Math.min(MAX_DRAW_MS, Math.max(MIN_DRAW_MS, this.pathLength * DRAW_MS_PER_UNIT));
+    // With "reduce motion" on, the route appears at once and the arrows sit still along it.
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    const drawDurationMs = reduceMotion
+      ? 1
+      : Math.min(MAX_DRAW_MS, Math.max(MIN_DRAW_MS, this.pathLength * DRAW_MS_PER_UNIT));
+    const flowSpeed = reduceMotion ? 0 : FLOW_SPEED;
+    const bobAmplitude = reduceMotion ? 0 : ARROW_BOB_AMPLITUDE;
 
     const tick = (now: number) => {
       const deltaSec = (now - this.lastFrameTime) / 1000;
@@ -342,7 +373,7 @@ export class FloorPlanViewer {
       pathEl.style.strokeDashoffset = `${this.pathLength - revealLength}`;
 
       // Keep advancing so arrows keep moving after the line is fully drawn.
-      this.flowOffset = this.pathLength > 0 ? (this.flowOffset + FLOW_SPEED * deltaSec) % this.pathLength : 0;
+      this.flowOffset = this.pathLength > 0 ? (this.flowOffset + flowSpeed * deltaSec) % this.pathLength : 0;
 
       const arrows = this.arrowRefs();
       const spacing = this.pathLength / ARROW_COUNT;
@@ -362,7 +393,7 @@ export class FloorPlanViewer {
         const angleDeg = (Math.atan2(ahead.y - point.y, ahead.x - point.x) * 180) / Math.PI;
 
         el.style.opacity = '1';
-        const bob = Math.sin(now * ARROW_BOB_SPEED + i * 1.7) * ARROW_BOB_AMPLITUDE;
+        const bob = Math.sin(now * ARROW_BOB_SPEED + i * 1.7) * bobAmplitude;
         el.style.transform = `translate(${point.x}px, ${point.y + bob}px) rotate(${angleDeg}deg) scale(${0.96 + Math.sin(now * 0.006 + i) * 0.025})`;
       }
 
@@ -386,7 +417,12 @@ export class FloorPlanViewer {
     this.scale.set(1);
     this.rotation.set(0);
     this.translateX.set(0);
-    this.translateY.set(0);
+    this.translateY.set(untracked(this.homeOffsetY));
+  }
+
+  /** Reset-zoom button: animate back to the whole floor, north-up. */
+  resetZoom(): void {
+    this.animateToView(1, 0, 0, this.homeOffsetY());
   }
 
   private zoomToPoint(x: number, y: number, rotation: number): void {
@@ -457,7 +493,7 @@ export class FloorPlanViewer {
 
   onPointerDown(event: PointerEvent): void {
     // Let taps on place markers through as clicks.
-    if ((event.target as HTMLElement).closest('.floor-plan-viewer__poi, .floor-plan-viewer__transition, .floor-plan-viewer__recenter')) return;
+    if ((event.target as HTMLElement).closest('.floor-plan-viewer__poi, .floor-plan-viewer__transition, .floor-plan-viewer__controls')) return;
 
     this.stopFocusAnimation();
     this.stageRef()?.nativeElement.setPointerCapture(event.pointerId);

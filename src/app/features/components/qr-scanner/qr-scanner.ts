@@ -45,6 +45,9 @@ export class QrScanner {
 
   private readonly videoRef = viewChild.required<ElementRef<HTMLVideoElement>>('video');
   readonly state = signal<ScannerState>('starting');
+  /** Torch (flashlight) toggle, offered only when the camera supports it — mostly Android Chrome. */
+  readonly torchAvailable = signal(false);
+  readonly torchOn = signal(false);
 
   private stream: MediaStream | null = null;
   private timer: ReturnType<typeof setTimeout> | null = null;
@@ -80,6 +83,8 @@ export class QrScanner {
     const video = this.videoRef().nativeElement;
     video.srcObject = this.stream;
     await video.play().catch(() => undefined);
+    const capabilities = this.stream.getVideoTracks()[0]?.getCapabilities?.() as { torch?: boolean } | undefined;
+    this.torchAvailable.set(!!capabilities?.torch);
     this.detector = await this.createNativeDetector();
     // jsQR is only downloaded on browsers without a native detector (e.g. iOS Safari, Firefox).
     if (!this.detector) this.jsQr ??= (await import('jsqr')).default;
@@ -90,6 +95,18 @@ export class QrScanner {
   close(): void {
     this.stop();
     this.closed.emit();
+  }
+
+  async toggleTorch(): Promise<void> {
+    const track = this.stream?.getVideoTracks()[0];
+    if (!track) return;
+    const on = !this.torchOn();
+    try {
+      await track.applyConstraints({ advanced: [{ torch: on } as MediaTrackConstraintSet] });
+      this.torchOn.set(on);
+    } catch {
+      this.torchAvailable.set(false);
+    }
   }
 
   private async createNativeDetector(): Promise<NativeBarcodeDetector | null> {
@@ -156,5 +173,6 @@ export class QrScanner {
     this.timer = null;
     this.stream?.getTracks().forEach((t) => t.stop());
     this.stream = null;
+    this.torchOn.set(false);
   }
 }

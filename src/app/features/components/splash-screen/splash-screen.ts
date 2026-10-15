@@ -1,86 +1,163 @@
-import { Component, input } from '@angular/core';
+import { Component, inject, input } from '@angular/core';
 import { BrandMark } from '../brand-mark/brand-mark';
+import { ThemeService } from '../../../core/services/theme';
 
-/** Full-screen branded page (loading, idle, error, journey complete). Content is projected below the logo. */
+/**
+ * Full-screen branded page (home, loading, error, journey complete): soft aurora + blueprint grid
+ * backdrop, brand bar on top, content projected into the middle.
+ */
 @Component({
   selector: 'app-splash-screen',
   imports: [BrandMark],
   template: `
     <section class="splash">
-      <div class="splash__glow" aria-hidden="true"></div>
-      <app-brand-mark [size]="64" [stacked]="true" [subtitle]="tagline()" />
-      @if (illustration()) {
-        <svg class="splash__art" viewBox="0 0 240 120" aria-hidden="true">
-          <g fill="var(--brand-tint)" stroke="#80AAFF" stroke-width="1.5">
-            <rect x="20" y="58" width="44" height="52" rx="3" />
-            <rect x="70" y="34" width="56" height="76" rx="3" />
-            <rect x="132" y="48" width="40" height="62" rx="3" />
-            <rect x="178" y="66" width="44" height="44" rx="3" />
-          </g>
-          <g fill="#80AAFF" opacity="0.7">
-            <rect x="80" y="44" width="10" height="8" rx="1" /><rect x="96" y="44" width="10" height="8" rx="1" />
-            <rect x="80" y="60" width="10" height="8" rx="1" /><rect x="96" y="60" width="10" height="8" rx="1" />
-            <rect x="80" y="76" width="10" height="8" rx="1" /><rect x="142" y="58" width="8" height="8" rx="1" />
-            <rect x="154" y="58" width="8" height="8" rx="1" /><rect x="142" y="74" width="8" height="8" rx="1" />
-            <rect x="30" y="68" width="8" height="8" rx="1" /><rect x="44" y="68" width="8" height="8" rx="1" />
-            <rect x="188" y="76" width="8" height="8" rx="1" /><rect x="202" y="76" width="8" height="8" rx="1" />
-          </g>
-          <line x1="8" y1="110" x2="232" y2="110" stroke="#80AAFF" stroke-width="1.5" />
-          <g class="splash__pin">
-            <path d="M120 98c-9-12-15-20-15-28a15 15 0 0 1 30 0c0 8-6 16-15 28Z" fill="#1854C8" />
-            <circle cx="120" cy="70" r="6" fill="#fff" />
-          </g>
-        </svg>
-      }
-      <div class="splash__content">
-        <ng-content />
+      <div class="splash__backdrop" aria-hidden="true">
+        <div class="splash__aurora"></div>
+        <div class="splash__grid"></div>
       </div>
+
+      <header class="splash__top">
+        <app-brand-mark [size]="30" />
+        <button
+          type="button"
+          class="icon-btn"
+          [attr.aria-label]="theme.theme() === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
+          (click)="theme.toggle()"
+        >
+          <span class="mi">{{ theme.theme() === 'dark' ? 'light_mode' : 'dark_mode' }}</span>
+        </button>
+      </header>
+
+      <main class="splash__body" [class.splash__body--fill]="fill()">
+        @if (busy()) {
+          <div class="splash__orbit" role="progressbar" aria-label="Loading">
+            <img src="logo.png" alt="" width="56" height="56" />
+          </div>
+        }
+        <ng-content />
+      </main>
     </section>
   `,
   styles: `
     .splash {
       position: relative;
+      isolation: isolate;
       min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      padding: calc(12px + var(--safe-top)) 20px calc(24px + var(--safe-bottom));
+      overflow: hidden;
+      background: var(--bg);
+    }
+
+    .splash__backdrop {
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+    }
+    .splash__aurora {
+      position: absolute;
+      inset: -20% -40% auto;
+      height: 75%;
+      background:
+        radial-gradient(40% 50% at 30% 40%, var(--accent-glow), transparent 70%),
+        radial-gradient(35% 45% at 72% 30%, color-mix(in srgb, var(--signal) 30%, transparent), transparent 70%);
+      opacity: 0.55;
+      filter: blur(20px);
+      animation: aurora-drift 18s ease-in-out infinite alternate;
+    }
+    .splash__grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(var(--line) 1px, transparent 1px),
+        linear-gradient(90deg, var(--line) 1px, transparent 1px);
+      background-size: 36px 36px;
+      background-position: center top;
+      -webkit-mask-image: radial-gradient(ellipse 85% 55% at 50% 22%, #000 20%, transparent 72%);
+      mask-image: radial-gradient(ellipse 85% 55% at 50% 22%, #000 20%, transparent 72%);
+    }
+
+    .splash__top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      width: min(100%, 440px);
+      margin: 0 auto;
+      min-height: 48px;
+    }
+
+    .splash__body {
+      flex: 1;
+      width: min(100%, 400px);
+      margin: 0 auto;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 28px;
-      padding: 40px 24px calc(40px + env(safe-area-inset-bottom));
+      gap: 16px;
+      padding: 24px 0 8px;
       text-align: center;
-      overflow: hidden;
-      background: var(--paper);
+      color: var(--ink-2);
+      animation: body-in 0.5s var(--ease-out) both;
     }
-    .splash__glow {
+    .splash__body--fill {
+      align-items: stretch;
+      justify-content: stretch;
+      text-align: left;
+    }
+
+    .splash__orbit {
+      position: relative;
+      width: 116px;
+      height: 116px;
+      display: grid;
+      place-items: center;
+      margin-bottom: 12px;
+    }
+    .splash__orbit::before,
+    .splash__orbit::after {
+      content: '';
       position: absolute;
-      inset: -30% -30% auto;
-      height: 70%;
-      background: radial-gradient(closest-side, var(--brand-tint), transparent);
-      pointer-events: none;
+      inset: 0;
+      border-radius: 50%;
     }
-    .splash__art {
-      position: relative;
-      width: min(260px, 70vw);
+    .splash__orbit::before {
+      border: 1px solid var(--line-strong);
     }
-    .splash__pin {
-      animation: splash-bounce 1.6s ease-in-out infinite;
+    .splash__orbit::after {
+      background: conic-gradient(from 0deg, transparent 0 62%, var(--accent) 100%);
+      -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px));
+      mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px));
+      animation: orbit 1.1s linear infinite;
     }
-    .splash__content {
-      position: relative;
-      width: min(340px, 100%);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 14px;
-      color: var(--body-gray);
+    .splash__orbit img {
+      border-radius: 24%;
+      box-shadow: 0 12px 28px -10px var(--accent-glow);
+      animation: breathe 2.2s ease-in-out infinite;
     }
-    @keyframes splash-bounce {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-6px); }
+
+    @keyframes aurora-drift {
+      to { transform: translate3d(6%, 4%, 0) scale(1.08); }
+    }
+    @keyframes orbit {
+      to { transform: rotate(360deg); }
+    }
+    @keyframes breathe {
+      50% { transform: scale(0.94); }
+    }
+    @keyframes body-in {
+      from { opacity: 0; transform: translateY(10px); }
     }
   `,
 })
 export class SplashScreen {
-  readonly tagline = input<string | null>('Indoor Navigation for a Better Tomorrow');
-  readonly illustration = input(false);
+  protected readonly theme = inject(ThemeService);
+
+  /** Shows the spinning orbit around the logo (loading states). */
+  readonly busy = input(false);
+  /** Lets the projected content lay itself out over the full height instead of being centered. */
+  readonly fill = input(false);
 }
