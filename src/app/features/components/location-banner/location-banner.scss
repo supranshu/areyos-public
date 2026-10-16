@@ -1,0 +1,188 @@
+.here {
+  display: flex;
+  flex-direction: column;
+  padding-top: 0;
+
+  // Full-width strip at the top of the sheet: tap or swipe to fold the sheet.
+  &__handle {
+    align-self: stretch;
+    height: 26px;
+    margin: 0 -18px;
+    display: grid;
+    place-items: center;
+    border: 0;
+    background: transparent;
+    cursor: grab;
+    touch-action: none;
+  }
+
+  &__grip {
+    width: 40px;
+    height: 5px;
+    border-radius: 999px;
+    background: var(--line-strong);
+    transition: background-color 0.16s ease, width 0.2s var(--ease-out);
+  }
+
+  &__handle:hover &__grip {
+    background: var(--muted);
+    width: 48px;
+  }
+
+  // Animatable height: grid rows go from 1fr to 0fr.
+  &__fold {
+    display: grid;
+    grid-template-rows: 1fr;
+    transition: grid-template-rows 0.32s var(--ease-out), opacity 0.22s ease;
+  }
+
+  // Lets the chip row scroll to the sheet edge (the inner wrapper clips overflow).
+  &__fold--bleed {
+    margin: 0 -18px;
+  }
+
+  &__fold-inner {
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  &--collapsed &__fold {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+
+  &__head {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 0 2px 14px;
+  }
+
+  &__eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 2px;
+    color: var(--accent-ink);
+  }
+
+  &__name {
+    font-size: 1.4rem;
+    font-weight: 650;
+    line-height: 1.15;
+    letter-spacing: -0.03em;
+    color: var(--ink);
+  }
+
+  &__meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.88rem;
+    color: var(--muted);
+  }
+
+  &__code {
+    min-width: 24px;
+    height: 22px;
+    padding: 0 6px;
+    display: inline-grid;
+    place-items: center;
+    border-radius: 7px;
+    background: var(--fill);
+    box-shadow: inset 0 0 0 1px var(--line);
+    color: var(--ink);
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  &__search {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: 56px;
+    padding: 0 18px;
+    border: 0;
+    border-radius: 18px;
+    background: var(--fill);
+    box-shadow: inset 0 0 0 1px var(--line);
+    color: var(--muted);
+    font-size: 1rem;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s var(--ease-out);
+
+    .mi {
+      color: var(--accent-ink);
+    }
+
+    &:hover {
+      background: var(--fill-hover);
+    }
+
+    &:active {
+      transform: scale(0.985);
+    }
+  }
+
+  &__search-text {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  // Horizontal, swipeable row of shortcuts; bleeds to the card edge so it reads as scrollable.
+  &__picks {
+    display: flex;
+    gap: 8px;
+    padding: 14px 18px 2px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    scroll-snap-type: x proximity;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  &__pick {
+    flex-shrink: 0;
+    max-width: 200px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 44px;
+    padding: 0 16px 0 12px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--bg-elevated);
+    box-shadow: inset 0 0 0 1px var(--line-strong);
+    color: var(--ink);
+    font-size: 0.9rem;
+    font-weight: 550;
+    cursor: pointer;
+    scroll-snap-align: start;
+    transition: transform 0.16s var(--ease-out), background-color 0.16s ease;
+
+    .mi {
+      font-size: 20px;
+    }
+
+    &:hover {
+      background: var(--fill-hover);
+    }
+
+    &:active {
+      transform: scale(0.96);
+    }
+  }
+
+  &__pick-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}

@@ -1,5 +1,6 @@
-import { Component, signal } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
+import { ThemeService } from './core/services/theme';
 
 @Component({
   imports: [RouterOutlet],
@@ -8,5 +9,6 @@ import { RouterOutlet } from '@angular/router';
   templateUrl: './app.html',
 })
 export class App {
-  protected readonly title = signal('areyos-public');
+  // Instantiated here so the saved/preferred theme is applied before the first screen renders.
+  protected readonly theme = inject(ThemeService);
 }

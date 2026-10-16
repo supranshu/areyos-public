@@ -1,1 +1,427 @@
-/* You can add global styles to this file, and also import other style files */
+/*
+ * Areyos visitor design system.
+ * The floor plan is the hero; everything else floats above it on frosted "glass" islands.
+ * One accent (brand blue), Geist for text, Geist Mono for data (floor codes, minutes, codes).
+ */
+
+@mixin light-tokens {
+  color-scheme: light;
+
+  --bg: #f3f5fa;
+  --bg-elevated: #ffffff;
+  --glass: rgba(255, 255, 255, 0.8);
+  --glass-strong: rgba(255, 255, 255, 0.94);
+  --glass-edge: rgba(255, 255, 255, 0.9);
+  --line: rgba(15, 23, 42, 0.08);
+  --line-strong: rgba(15, 23, 42, 0.14);
+  --fill: rgba(15, 23, 42, 0.045);
+  --fill-hover: rgba(15, 23, 42, 0.075);
+
+  --ink: #0b1220;
+  --ink-2: #3a465b;
+  --muted: #647089;
+
+  --accent: #1854c8;
+  --accent-ink: #1854c8;
+  --accent-soft: rgba(24, 84, 200, 0.09);
+  --accent-gradient: linear-gradient(135deg, #3a7bff 0%, #1854c8 58%, #1446ae 100%);
+  --accent-glow: rgba(24, 84, 200, 0.32);
+  --signal: #2f8bff;
+
+  --success: #0e9f6e;
+  --success-soft: rgba(14, 159, 110, 0.12);
+  --danger: #dc3a3f;
+  --danger-soft: rgba(220, 58, 63, 0.1);
+  --warn: #f29a12;
+
+  --map-bg: #e8ecf4;
+  --map-dot: rgba(15, 23, 42, 0.07);
+  --plan-filter: none;
+
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06), 0 2px 8px rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 2px 6px rgba(15, 23, 42, 0.06), 0 12px 32px rgba(15, 23, 42, 0.1);
+  --shadow-lg: 0 4px 12px rgba(15, 23, 42, 0.06), 0 24px 56px rgba(15, 23, 42, 0.16);
+}
+
+@mixin dark-tokens {
+  color-scheme: dark;
+
+  --bg: #05080f;
+  --bg-elevated: #0e1422;
+  --glass: rgba(15, 21, 36, 0.72);
+  --glass-strong: rgba(17, 24, 40, 0.94);
+  --glass-edge: rgba(255, 255, 255, 0.07);
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.14);
+  --fill: rgba(255, 255, 255, 0.05);
+  --fill-hover: rgba(255, 255, 255, 0.09);
+
+  --ink: #eef2ff;
+  --ink-2: #b9c3da;
+  --muted: #8692ae;
+
+  --accent: #5b8cff;
+  --accent-ink: #8fb0ff;
+  --accent-soft: rgba(91, 140, 255, 0.14);
+  --accent-gradient: linear-gradient(135deg, #6e9bff 0%, #2f6bff 55%, #1854c8 100%);
+  --accent-glow: rgba(64, 120, 255, 0.45);
+  --signal: #4f9dff;
+
+  --success: #34d399;
+  --success-soft: rgba(52, 211, 153, 0.14);
+  --danger: #ff6b70;
+  --danger-soft: rgba(255, 107, 112, 0.14);
+  --warn: #f5a524;
+
+  --map-bg: #070b14;
+  --map-dot: rgba(255, 255, 255, 0.06);
+  // Floor plans are drawn dark-on-white; invert them so the map doesn't glare at night.
+  --plan-filter: invert(0.9) hue-rotate(180deg) saturate(0.85) brightness(0.92);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.35), 0 12px 32px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.4), 0 24px 56px rgba(0, 0, 0, 0.55);
+}
+
+:root {
+  @include light-tokens;
+
+  --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --radius-xl: 28px;
+  --radius-lg: 22px;
+  --radius-md: 16px;
+  --radius-sm: 12px;
+
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-spring: cubic-bezier(0.3, 1.35, 0.5, 1);
+
+  // Floating islands sit this far from the screen edges.
+  --gutter: 10px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+:root[data-theme='dark'] {
+  @include dark-tokens;
+}
+
+// Before Angular applies the saved theme, follow the OS so the first paint doesn't flash.
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    @include dark-tokens;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  background: var(--bg);
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  min-height: 100dvh;
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.45;
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'ss01', 'cv11';
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+p,
+h1,
+h2,
+h3 {
+  margin: 0;
+}
+
+::selection {
+  background: var(--accent-soft);
+}
+
+// One consistent, highly visible focus ring for keyboard users.
+:focus-visible {
+  outline: 2.5px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Material Symbols (Rounded) ligature helper: <span class="mi">place</span>. Add .mi--fill for the solid style. */
+.mi {
+  font-family: 'Material Symbols Rounded';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 22px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  font-feature-settings: 'liga';
+  font-variation-settings: 'FILL' 0, 'wght' 450, 'opsz' 24;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  flex-shrink: 0;
+
+  &--fill {
+    font-variation-settings: 'FILL' 1, 'wght' 450, 'opsz' 24;
+  }
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-feature-settings: 'zero';
+  letter-spacing: -0.01em;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------- Surfaces ---------- */
+
+// Frosted panel. Inner top highlight + hairline border reads as glass in both themes.
+.glass {
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(22px) saturate(1.6);
+  backdrop-filter: blur(22px) saturate(1.6);
+  border: 1px solid var(--line);
+  box-shadow: inset 0 1px 0 var(--glass-edge), var(--shadow-md);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass {
+    background: var(--glass-strong);
+  }
+}
+
+// Floating card over the map (bottom on phones, a side panel on wide screens). Pair with .glass.
+.sheet {
+  position: relative;
+  padding: 18px;
+  border-radius: var(--radius-xl);
+  color: var(--ink);
+  animation: sheet-up 0.42s var(--ease-out) both;
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(18px) scale(0.985);
+    opacity: 0;
+  }
+}
+
+// Small uppercase label used for section titles and data captions.
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.place-tile {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 15px;
+  color: #fff;
+  font-size: 24px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 6px 16px -6px rgba(15, 23, 42, 0.4);
+}
+
+// Pulsing "live" dot (current location, scanning).
+.live-dot {
+  position: relative;
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--signal);
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: var(--signal);
+    animation: live-ping 1.8s var(--ease-out) infinite;
+  }
+}
+
+@keyframes live-ping {
+  from {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  to {
+    transform: scale(3);
+    opacity: 0;
+  }
+}
+
+/* ---------- Buttons ---------- */
+
+.btn-primary,
+.btn-secondary,
+.btn-ghost,
+.btn-danger,
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition:
+    transform 0.16s var(--ease-out),
+    background-color 0.16s ease,
+    box-shadow 0.2s ease,
+    filter 0.16s ease,
+    opacity 0.16s ease;
+
+  &:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .mi {
+    font-size: 20px;
+  }
+}
+
+.btn-primary {
+  position: relative;
+  height: 56px;
+  padding: 0 22px;
+  border-radius: 18px;
+  background: var(--accent-gradient);
+  color: #fff;
+  font-size: 1rem;
+  letter-spacing: -0.01em;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.12),
+    0 10px 24px -8px var(--accent-glow);
+
+  &:hover:not(:disabled) {
+    filter: brightness(1.07);
+  }
+}
+
+.btn-secondary {
+  height: 56px;
+  padding: 0 20px;
+  border-radius: 18px;
+  background: var(--fill);
+  color: var(--ink);
+  font-size: 1rem;
+  box-shadow: inset 0 0 0 1px var(--line);
+
+  &:hover:not(:disabled) {
+    background: var(--fill-hover);
+  }
+}
+
+.btn-ghost {
+  height: 44px;
+  padding: 0 14px;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--accent-ink);
+  font-size: 0.95rem;
+
+  &:hover:not(:disabled) {
+    background: var(--accent-soft);
+  }
+}
+
+.btn-danger {
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 0.9rem;
+
+  &:hover:not(:disabled) {
+    filter: brightness(1.1);
+  }
+}
+
+// Round, borderless 44px icon button.
+.icon-btn {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink);
+
+  &:hover:not(:disabled) {
+    background: var(--fill-hover);
+  }
+
+  .mi {
+    font-size: 22px;
+  }
+}
+
+/* ---------- Motion preferences ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

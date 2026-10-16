@@ -1,0 +1,145 @@
+<div class="floor-plan-viewer">
+  @if (!imageUrl() || !floorPlan()) {
+    <div class="floor-plan-viewer__placeholder">
+      <span class="mi">map</span>
+      <p>{{ placeholder() }}</p>
+    </div>
+  } @else {
+    <div
+      #stage
+      class="floor-plan-viewer__stage"
+      (pointerdown)="onPointerDown($event)"
+      (pointermove)="onPointerMove($event)"
+      (pointerup)="onPointerUp($event)"
+      (pointercancel)="onPointerUp($event)"
+      (wheel)="onWheel($event)"
+      (dblclick)="onDoubleClick($event)"
+    >
+      <div class="floor-plan-viewer__canvas" [style.transform]="canvasTransform()">
+        <img
+          class="floor-plan-viewer__image"
+          [src]="imageUrl()"
+          [alt]="floorPlan()!.floorName + ' floor plan'"
+          draggable="false"
+        />
+
+        <svg class="floor-plan-viewer__overlay" [attr.viewBox]="viewBox()" preserveAspectRatio="xMidYMid meet">
+          <defs>
+            <linearGradient id="route-core-gradient" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#80AAFF" />
+              <stop offset="48%" stop-color="#1854C8" />
+              <stop offset="100%" stop-color="#0B3A9B" />
+            </linearGradient>
+            <linearGradient id="route-edge-gradient" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.96" />
+              <stop offset="100%" stop-color="#D8E5FF" stop-opacity="0.72" />
+            </linearGradient>
+            <filter id="route-glow-filter" x="-40%" y="-40%" width="180%" height="180%">
+              <feGaussianBlur stdDeviation="10" />
+            </filter>
+            <filter id="route-shadow-filter" x="-30%" y="-30%" width="160%" height="160%">
+              <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#0B275C" flood-opacity="0.38" />
+            </filter>
+          </defs>
+
+          @if (pathD()) {
+            <path class="floor-plan-viewer__route-glow" [attr.d]="pathD()" fill="none" />
+            <path class="floor-plan-viewer__route-edge" [attr.d]="pathD()" fill="none" />
+            <path #routeLine class="floor-plan-viewer__route-line" [attr.d]="pathD()" fill="none" />
+            <path class="floor-plan-viewer__route-highlight" [attr.d]="pathD()" fill="none" />
+
+            @for (i of arrowIndices; track i) {
+              <g #arrowRef class="floor-plan-viewer__flow-arrow" style="opacity: 0">
+                <circle class="floor-plan-viewer__arrow-halo" r="10" />
+                <circle class="floor-plan-viewer__arrow-disc" r="7" />
+                <polygon class="floor-plan-viewer__arrow-chevron" points="-4,-3 5,0 -4,3 -2,0" />
+              </g>
+            }
+          }
+
+          @for (point of waypoints(); track $index) {
+            <circle class="floor-plan-viewer__waypoint" [attr.cx]="point.x" [attr.cy]="point.y" r="4" />
+          }
+        </svg>
+
+        <!-- HTML markers: positioned in stage pixels, counter-transformed so they stay upright and readable. -->
+        @for (poi of poisOnThisFloor(); track poi.nodeId) {
+          <button
+            type="button"
+            class="floor-plan-viewer__poi"
+            [style.left.px]="toStage(poi).left"
+            [style.top.px]="toStage(poi).top"
+            [style.--counter]="markerCounterTransform()"
+            [attr.aria-label]="'Go to ' + poi.name"
+            (click)="selectPoi($event, poi.nodeId)"
+          >
+            <span class="floor-plan-viewer__poi-icon mi" [style.background]="poi.color">{{ poi.icon }}</span>
+            <span class="floor-plan-viewer__poi-label">{{ poi.name }}</span>
+          </button>
+        }
+
+        @for (t of transitionsOnThisFloor(); track $index) {
+          <button
+            type="button"
+            class="floor-plan-viewer__transition"
+            [style.left.px]="toStage(t).left"
+            [style.top.px]="toStage(t).top"
+            [style.--counter]="markerCounterTransform()"
+            [attr.aria-label]="t.label"
+            (click)="jumpToFloor($event, t.targetFloorId)"
+          >
+            <span class="mi">{{ t.icon }}</span>
+            <span>{{ t.label }}</span>
+          </button>
+        }
+
+        @if (destinationOnThisFloor(); as dest) {
+          <div
+            class="floor-plan-viewer__pin"
+            [style.left.px]="toStage(dest).left"
+            [style.top.px]="toStage(dest).top"
+            [style.--counter]="markerCounterTransform()"
+          >
+            <span class="floor-plan-viewer__pin-head" [style.background]="dest.color">
+              <span class="mi">{{ dest.icon }}</span>
+            </span>
+            <span class="floor-plan-viewer__pin-label">{{ dest.name }}</span>
+          </div>
+        }
+
+        @if (youOnThisFloor(); as you) {
+          <div
+            class="floor-plan-viewer__you"
+            [style.left.px]="toStage(you).left"
+            [style.top.px]="toStage(you).top"
+            [style.--counter]="markerCounterTransform()"
+          >
+            <span class="floor-plan-viewer__you-pulse"></span>
+            <span class="floor-plan-viewer__you-dot"></span>
+            @if (youAreHereLabel()) {
+              <span class="floor-plan-viewer__you-callout">
+                <strong>You are here</strong>
+                <span>{{ youAreHereLabel() }}</span>
+              </span>
+            }
+          </div>
+        }
+      </div>
+
+      <div class="floor-plan-viewer__controls" [style.bottom.px]="bottomInset() + 16">
+        @if (youOnThisFloor()) {
+          <button type="button" class="floor-plan-viewer__control" aria-label="Show whole floor" title="Show whole floor" (click)="resetZoom()">
+            <span class="mi">zoom_out_map</span>
+          </button>
+          <button type="button" class="floor-plan-viewer__control" aria-label="Recenter map" title="Recenter map" (click)="recenter()">
+            <span class="mi">my_location</span>
+          </button>
+        } @else {
+          <button type="button" class="floor-plan-viewer__control" aria-label="Reset view" title="Reset view" (click)="recenter()">
+            <span class="mi">zoom_out_map</span>
+          </button>
+        }
+      </div>
+    </div>
+  }
+</div>

@@ -1,0 +1,181 @@
+@switch (store.phase()) {
+  @case ('idle') {
+    <app-splash-screen [fill]="true">
+      <app-home-screen (scan)="scannerOpen.set(true)" (submitCode)="openCode($event)" />
+    </app-splash-screen>
+    @if (scannerOpen()) {
+      <app-qr-scanner (scanned)="onScanned($event)" (closed)="scannerOpen.set(false)" />
+    }
+  }
+
+  @case ('resolving-qr') {
+    <app-splash-screen [busy]="true">
+      <h1 class="status__title">Reading your QR code</h1>
+      <p class="status__text">Finding exactly where you are…</p>
+    </app-splash-screen>
+  }
+
+  @case ('loading-venue-data') {
+    <app-splash-screen [busy]="true">
+      <h1 class="status__title">Loading your map</h1>
+      <p class="status__text">Getting floors and places ready…</p>
+    </app-splash-screen>
+  }
+
+  @case ('error') {
+    <app-splash-screen>
+      <span class="status__icon status__icon--danger mi">error</span>
+      <h1 class="status__title">Something went wrong</h1>
+      <p class="status__text" role="alert">{{ store.errorMessage() }}</p>
+      <div class="status__actions">
+        <button type="button" class="btn-primary" (click)="store.retry()">
+          <span class="mi">refresh</span>
+          Try again
+        </button>
+        <button type="button" class="btn-secondary" (click)="scanAnother()">Use a different code</button>
+      </div>
+    </app-splash-screen>
+  }
+
+  @case ('complete') {
+    <app-splash-screen>
+      <span class="status__emblem" aria-hidden="true"><span class="mi">check</span></span>
+      <h1 class="status__title status__title--lg">You're where you need to be.</h1>
+      <p class="status__text">Thanks for finding your way with Areyos.</p>
+      <div class="status__tiles">
+        <button type="button" (click)="scanAnother()"><span class="mi">qr_code_scanner</span>Scan code</button>
+        <button type="button" (click)="findAnother()"><span class="mi">search</span>Find a place</button>
+        <button type="button" (click)="store.clearRoute()"><span class="mi">map</span>Back to map</button>
+      </div>
+    </app-splash-screen>
+  }
+
+  @default {
+    <main class="map-screen">
+      <app-floor-plan-viewer
+        class="map-screen__map"
+        [imageUrl]="store.activeFloorImageUrl()"
+        [floorPlan]="store.activeFloorPlan()"
+        [placeholder]="store.activeFloorHasNoPlan() ? 'No map is available for this floor yet.' : 'Loading floor plan…'"
+        [youAreHere]="store.youAreHere()"
+        [youAreHereLabel]="store.phase() === 'ready' ? store.startPoint()?.name ?? null : null"
+        [destination]="destinationPoi()"
+        [routePoints]="store.visibleRoutePoints()"
+        [pois]="pois()"
+        [transitions]="transitions()"
+        [focusMode]="focusMode()"
+        [topInset]="topInset()"
+        [bottomInset]="bottomInset()"
+        (poiSelected)="onPoiSelected($event)"
+        (floorJump)="store.viewFloor($event)"
+      />
+
+      <div class="map-screen__top" #topOverlay>
+        @if (store.phase() === 'navigating' && store.selectedDestination(); as dest) {
+          <header class="nav-header glass">
+            <span class="place-tile mi mi--fill nav-header__tile" [style.background]="destinationIcon()?.color">
+              {{ destinationIcon()?.icon }}
+            </span>
+            <div class="nav-header__text">
+              <p class="eyebrow">Navigating to</p>
+              <p class="nav-header__name">{{ dest.name }}</p>
+            </div>
+            <button type="button" class="btn-danger" (click)="store.endNavigation()">End</button>
+          </header>
+        } @else {
+          <app-top-bar
+            [venueName]="store.venue()?.name ?? null"
+            [floorName]="store.activeFloor()?.name ?? null"
+            (find)="openSearch()"
+            (scan)="scanAnother()"
+          />
+        }
+      </div>
+
+      @if (store.floors().length > 1) {
+        <div class="map-screen__floor" [style.top.px]="topInset() + 10">
+          <app-floor-switcher
+            [floors]="store.floors()"
+            [activeFloorId]="store.activeFloorId()"
+            [routeFloorIds]="routeFloorIds()"
+            (floorSelected)="store.viewFloor($event)"
+          />
+        </div>
+      }
+
+      <div class="map-screen__bottom" #bottomOverlay>
+        @if (store.routeError(); as routeError) {
+          <div class="map-screen__toast glass" role="alert">
+            <span class="mi mi--fill">error</span>
+            <span>{{ routeError }}</span>
+            <button type="button" class="icon-btn" aria-label="Dismiss" (click)="store.dismissRouteError()">
+              <span class="mi">close</span>
+            </button>
+          </div>
+        }
+
+        @switch (store.phase()) {
+          @case ('ready') {
+            @if (store.venue(); as venue) {
+              <app-location-banner
+                [venue]="venue"
+                [startPoint]="store.startPoint()!"
+                [destinations]="store.destinations()"
+                (search)="openSearch()"
+                (destinationSelected)="chooseDestination($event)"
+              />
+            }
+          }
+          @case ('calculating-route') {
+            <section class="sheet glass calculating" aria-live="polite">
+              <span class="calculating__orbit" aria-hidden="true"></span>
+              <div class="calculating__text">
+                <p class="eyebrow">Finding the best route</p>
+                <p class="calculating__name">{{ store.selectedDestination()?.name }}</p>
+              </div>
+            </section>
+          }
+          @case ('route-ready') {
+            @if (store.route(); as route) {
+              <app-route-summary
+                [route]="route"
+                [destination]="store.selectedDestination()!"
+                (start)="store.startNavigation()"
+                (clear)="store.clearRoute()"
+              />
+            }
+          }
+          @case ('navigating') {
+            @if (store.currentStep(); as step) {
+              <app-instruction-card
+                [step]="step"
+                [index]="store.stepIndex()"
+                [total]="store.steps().length"
+                (next)="store.nextStep()"
+                (previous)="store.previousStep()"
+              />
+            }
+          }
+          @case ('arrived') {
+            <section class="sheet glass arrived" aria-live="polite">
+              <span class="arrived__check" aria-hidden="true"><span class="mi">check</span></span>
+              <p class="eyebrow arrived__eyebrow">You've arrived</p>
+              <h2 class="arrived__place">{{ store.selectedDestination()?.name }}</h2>
+              <p class="arrived__thanks">Thanks for using Areyos.</p>
+              <button type="button" class="btn-primary arrived__done" (click)="store.finishJourney()">Done</button>
+            </section>
+          }
+        }
+      </div>
+
+      @if (searchOpen()) {
+        <app-destination-selector
+          [destinations]="store.destinations()"
+          [startPoint]="store.startPoint()"
+          (destinationSelected)="chooseDestination($event)"
+          (closed)="searchOpen.set(false)"
+        />
+      }
+    </main>
+  }
+}

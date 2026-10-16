@@ -1,0 +1,440 @@
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.floor-plan-viewer {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  // Faint blueprint dot grid behind (and around) the plan.
+  background-color: var(--map-bg);
+  background-image: radial-gradient(var(--map-dot) 1px, transparent 1.4px);
+  background-size: 22px 22px;
+
+  &__placeholder {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 24px;
+    color: var(--muted);
+    font-size: 0.92rem;
+    text-align: center;
+
+    .mi {
+      width: 64px;
+      height: 64px;
+      display: grid;
+      place-items: center;
+      border-radius: 20px;
+      background: var(--glass);
+      border: 1px solid var(--line);
+      font-size: 30px;
+      animation: placeholder-pulse 1.8s ease-in-out infinite;
+    }
+  }
+
+  &__stage {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    // Blocks the browser's native pinch-zoom/pan here so gestures drive the map instead of the page.
+    touch-action: none;
+    cursor: grab;
+
+    &:active {
+      cursor: grabbing;
+    }
+  }
+
+  &__canvas {
+    position: absolute;
+    inset: 0;
+    transform-origin: 0 0;
+    user-select: none;
+    will-change: transform;
+  }
+
+  &__image {
+    width: 100%;
+    height: 100%;
+    object-fit: contain; // whole plan visible; the SVG overlay letterboxes identically ("meet")
+    display: block;
+    pointer-events: none;
+    filter: var(--plan-filter);
+    animation: plan-in 0.5s ease-out;
+  }
+
+  &__overlay {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    overflow: visible;
+  }
+
+  // ---------- route ----------
+  &__route-glow,
+  &__route-edge,
+  &__route-line {
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
+  }
+
+  &__route-glow {
+    stroke: #5b8cff;
+    stroke-width: 18;
+    opacity: 0.22;
+    filter: url('#route-glow-filter');
+    animation: route-breathe 2.4s ease-in-out infinite;
+  }
+
+  &__route-edge {
+    stroke: url('#route-edge-gradient');
+    stroke-width: 10;
+    opacity: 0.95;
+    filter: url('#route-shadow-filter');
+  }
+
+  &__route-line {
+    stroke: url('#route-core-gradient');
+    stroke-width: 6;
+  }
+
+  &__route-highlight {
+    stroke: rgba(255, 255, 255, 0.75);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 1 34;
+    animation: route-sparkle 1.1s linear infinite;
+    vector-effect: non-scaling-stroke;
+  }
+
+  &__flow-arrow {
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+
+  &__arrow-halo {
+    fill: #5b8cff;
+    opacity: 0.22;
+    filter: url('#route-glow-filter');
+  }
+
+  &__arrow-disc {
+    fill: #1854c8;
+    stroke: rgba(255, 255, 255, 0.95);
+    stroke-width: 1.5;
+    filter: url('#route-shadow-filter');
+  }
+
+  &__arrow-chevron {
+    fill: #ffffff;
+    stroke: #dbe7ff;
+    stroke-width: 0.75;
+    stroke-linejoin: round;
+  }
+
+  &__waypoint {
+    fill: #fff;
+    stroke: #1854c8;
+    stroke-width: 2.5;
+    vector-effect: non-scaling-stroke;
+  }
+
+  // ---------- HTML markers ----------
+  // Each marker's top-left sits on its anchor; the transform re-centres it and cancels the canvas
+  // rotation/zoom (`--counter`) so it stays upright at a constant size.
+  &__poi,
+  &__pin,
+  &__you {
+    position: absolute;
+    z-index: 1;
+  }
+
+  &__poi {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    transform-origin: 50% 16px;
+    transform: translate(-50%, -16px) var(--counter);
+    animation: marker-in 0.35s var(--ease-spring) both;
+
+    &:hover .floor-plan-viewer__poi-icon,
+    &:focus-visible .floor-plan-viewer__poi-icon {
+      transform: scale(1.12);
+    }
+  }
+
+  &__poi-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 11px;
+    display: grid;
+    place-items: center;
+    color: #fff;
+    font-size: 18px;
+    font-variation-settings: 'FILL' 1, 'wght' 500, 'opsz' 20;
+    border: 2px solid #fff;
+    box-shadow: 0 4px 10px -2px rgba(10, 16, 30, 0.35);
+    transition: transform 0.18s var(--ease-spring);
+  }
+
+  &__poi-label {
+    max-width: 104px;
+    padding: 2px 7px;
+    border-radius: 7px;
+    background: var(--glass-strong);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    box-shadow: 0 0 0 1px var(--line), 0 2px 6px rgba(10, 16, 30, 0.12);
+    color: var(--ink);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.4;
+    letter-spacing: -0.005em;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  // Floor-change marker: anchored above the stairs/lift node, like a speech bubble.
+  &__transition {
+    position: absolute;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-height: 34px;
+    padding: 0 12px 0 8px;
+    border: 2px solid #fff;
+    border-radius: 999px;
+    background: var(--warn);
+    color: #1a1204;
+    font-size: 12.5px;
+    font-weight: 650;
+    white-space: nowrap;
+    cursor: pointer;
+    box-shadow: 0 8px 18px -6px rgba(10, 16, 30, 0.4);
+    transform-origin: 50% 100%;
+    transform: translate(-50%, calc(-100% - 12px)) var(--counter);
+    animation: transition-bob 1.8s ease-in-out infinite;
+
+    &::after {
+      // little tail pointing at the node
+      content: '';
+      position: absolute;
+      left: 50%;
+      bottom: -7px;
+      width: 10px;
+      height: 10px;
+      background: var(--warn);
+      border-right: 2px solid #fff;
+      border-bottom: 2px solid #fff;
+      transform: translateX(-50%) rotate(45deg);
+      border-bottom-right-radius: 3px;
+    }
+
+    .mi {
+      font-size: 17px;
+    }
+  }
+
+  &__pin {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transform-origin: 50% 100%;
+    transform: translate(-50%, -100%) var(--counter);
+    z-index: 2;
+  }
+
+  &__pin-head {
+    width: 44px;
+    height: 44px;
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    display: grid;
+    place-items: center;
+    border: 3px solid #fff;
+    box-shadow: 0 10px 20px -6px rgba(10, 16, 30, 0.45);
+    animation: pin-drop 0.55s var(--ease-spring) both;
+
+    .mi {
+      transform: rotate(45deg);
+      color: #fff;
+      font-size: 21px;
+      font-variation-settings: 'FILL' 1, 'wght' 500, 'opsz' 24;
+    }
+  }
+
+  &__pin-label {
+    order: -1;
+    margin-bottom: 8px;
+    padding: 5px 10px;
+    border-radius: 10px;
+    background: var(--glass-strong);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 0 0 1px var(--line), var(--shadow-md);
+    color: var(--ink);
+    font-size: 12.5px;
+    font-weight: 650;
+    white-space: nowrap;
+    animation: marker-in 0.4s 0.2s var(--ease-out) both;
+  }
+
+  &__you {
+    width: 0;
+    height: 0;
+    transform: var(--counter);
+    z-index: 3;
+  }
+
+  &__you-dot,
+  &__you-pulse {
+    position: absolute;
+    left: 0;
+    top: 0;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  &__you-dot {
+    width: 22px;
+    height: 22px;
+    background: radial-gradient(circle at 35% 35%, #6ea2ff, #1854c8 70%);
+    border: 3px solid #fff;
+    box-shadow: 0 0 0 1px rgba(24, 84, 200, 0.25), 0 4px 12px rgba(24, 84, 200, 0.55);
+  }
+
+  &__you-pulse {
+    width: 22px;
+    height: 22px;
+    background: rgba(47, 139, 255, 0.35);
+    animation: you-pulse 2.2s ease-out infinite;
+  }
+
+  &__you-callout {
+    position: absolute;
+    left: 20px;
+    top: 0;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    padding: 7px 12px;
+    border-radius: 12px;
+    background: var(--glass-strong);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 0 0 1px var(--line), var(--shadow-md);
+    color: var(--ink);
+    white-space: nowrap;
+    font-size: 12px;
+    line-height: 1.3;
+    animation: marker-in 0.4s 0.15s var(--ease-out) both;
+
+    strong {
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    span {
+      color: var(--muted);
+    }
+  }
+
+  // Map controls: one glass column, buttons separated by a hairline (like a native maps app).
+  &__controls {
+    position: absolute;
+    right: calc(var(--gutter) + 2px);
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(22px) saturate(1.6);
+    backdrop-filter: blur(22px) saturate(1.6);
+    box-shadow: inset 0 1px 0 var(--glass-edge), var(--shadow-md);
+    overflow: hidden;
+    z-index: 4;
+    transition: bottom 0.3s var(--ease-out);
+  }
+
+  &__control {
+    width: 48px;
+    height: 48px;
+    display: grid;
+    place-items: center;
+    border: 0;
+    background: transparent;
+    color: var(--accent-ink);
+    cursor: pointer;
+    transition: background-color 0.16s ease;
+
+    & + & {
+      border-top: 1px solid var(--line);
+    }
+
+    &:hover {
+      background: var(--fill-hover);
+    }
+
+    &:active .mi {
+      transform: scale(0.88);
+    }
+
+    .mi {
+      transition: transform 0.16s var(--ease-out);
+    }
+  }
+}
+
+@keyframes you-pulse {
+  0% { transform: translate(-50%, -50%) scale(1); opacity: 0.9; }
+  100% { transform: translate(-50%, -50%) scale(3.4); opacity: 0; }
+}
+
+@keyframes transition-bob {
+  0%, 100% { margin-top: 0; }
+  50% { margin-top: -3px; }
+}
+
+@keyframes pin-drop {
+  from { transform: rotate(-45deg) translate(0, -20px) scale(0.6); opacity: 0; }
+  to { transform: rotate(-45deg) translate(0, 0) scale(1); opacity: 1; }
+}
+
+@keyframes marker-in {
+  from { opacity: 0; }
+}
+
+@keyframes plan-in {
+  from { opacity: 0; }
+}
+
+@keyframes placeholder-pulse {
+  50% { opacity: 0.55; }
+}
+
+@keyframes route-breathe {
+  0%, 100% { opacity: 0.18; }
+  50% { opacity: 0.34; }
+}
+
+@keyframes route-sparkle {
+  to { stroke-dashoffset: -35; }
+}

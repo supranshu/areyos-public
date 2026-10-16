@@ -1,0 +1,73 @@
+<section class="search" role="dialog" aria-modal="true" aria-label="Find a destination">
+  <header class="search__bar">
+    <button type="button" class="icon-btn" aria-label="Back to map" (click)="closed.emit()">
+      <span class="mi">arrow_back</span>
+    </button>
+    <div class="search__field">
+      <span class="mi search__field-icon">search</span>
+      <input
+        #searchInput
+        type="search"
+        class="search__input"
+        placeholder="Search places"
+        aria-label="Search places"
+        autocomplete="off"
+        enterkeyhint="search"
+        [value]="searchTerm()"
+        (input)="searchTerm.set($any($event.target).value)"
+        (keydown.escape)="closed.emit()"
+        (keydown.enter)="chooseOnlyResult()"
+      />
+      @if (searchTerm()) {
+        <button type="button" class="search__clear" aria-label="Clear search" (click)="clear()">
+          <span class="mi">close</span>
+        </button>
+      }
+    </div>
+  </header>
+
+  <div class="search__body">
+    <p class="search__count eyebrow" aria-live="polite">
+      {{ resultCount() }} place{{ resultCount() === 1 ? '' : 's' }}{{ searchTerm() ? ' found' : '' }}
+    </p>
+
+    @for (group of groups(); track group.floorId) {
+      <section class="search__group">
+        <h3 class="search__floor">
+          {{ group.floorName }}
+          @if (group.isHere) {
+            <span class="search__here"><span class="live-dot"></span>You're here</span>
+          }
+        </h3>
+        <ul class="search__list">
+          @for (row of group.rows; track row.destination.nodeId) {
+            <li>
+              <button type="button" class="search__row" (click)="choose(row.destination)">
+                <span class="search__row-icon mi mi--fill" [style.color]="row.icon.color">
+                  <span class="search__row-tint" [style.background]="row.icon.color"></span>
+                  {{ row.icon.icon }}
+                </span>
+                <span class="search__row-name">{{ row.destination.name }}</span>
+                @if (row.minutes !== null) {
+                  <span class="search__row-time"><span class="mono">{{ row.minutes }}</span> min</span>
+                }
+                <span class="mi search__row-go" aria-hidden="true">chevron_right</span>
+              </button>
+            </li>
+          }
+        </ul>
+      </section>
+    } @empty {
+      <div class="search__empty">
+        <span class="search__empty-icon mi">search_off</span>
+        @if (searchTerm()) {
+          <p><strong>No places match “{{ searchTerm() }}”.</strong></p>
+          <p>Try a shorter word, like “toilet” or “lab”.</p>
+        } @else {
+          <p><strong>No destinations yet.</strong></p>
+          <p>This venue hasn't added any places to navigate to.</p>
+        }
+      </div>
+    }
+  </div>
+</section>

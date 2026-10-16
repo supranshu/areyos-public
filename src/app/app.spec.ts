@@ -15,10 +15,23 @@ describe('App', () => {
     expect(app).toBeTruthy();
   });
 
-  it('should render title', async () => {
+  it('should initialize the document language and theme from browser preferences', () => {
+    const mediaQueryList = {
+      matches: true,
+      addEventListener: jasmine.createSpy('addEventListener'),
+      removeEventListener: jasmine.createSpy('removeEventListener'),
+    } as MediaQueryList;
+
+    spyOn(window, 'matchMedia').and.returnValue(mediaQueryList);
+    spyOn(window.navigator, 'language').and.returnValue('ur-PK');
+    document.documentElement.dataset.theme = 'light';
+    document.documentElement.lang = 'en';
+
     const fixture = TestBed.createComponent(App);
-    await fixture.whenStable();
-    const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('h1')?.textContent).toContain('Hello, areyos-public');
+    fixture.detectChanges();
+
+    expect(document.documentElement.dataset.theme).toBe('dark');
+    expect(document.documentElement.lang).toBe('ur');
+    expect(fixture.componentInstance.currentLanguage()).toBe('ur');
   });
 });

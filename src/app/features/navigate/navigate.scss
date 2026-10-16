@@ -1,0 +1,374 @@
+// ---------- status screens (loading / error / journey complete) ----------
+.status {
+  &__title {
+    font-size: 1.6rem;
+    font-weight: 650;
+    line-height: 1.15;
+    letter-spacing: -0.035em;
+    color: var(--ink);
+    text-wrap: balance;
+
+    &--lg {
+      font-size: clamp(1.9rem, 8vw, 2.4rem);
+    }
+  }
+
+  &__text {
+    max-width: 32ch;
+    font-size: 1rem;
+    line-height: 1.5;
+    color: var(--ink-2);
+    text-wrap: pretty;
+  }
+
+  &__icon {
+    width: 76px;
+    height: 76px;
+    display: grid;
+    place-items: center;
+    margin-bottom: 8px;
+    border-radius: 26px;
+    font-size: 38px;
+
+    &--danger {
+      background: var(--danger-soft);
+      color: var(--danger);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 18%, transparent);
+    }
+  }
+
+  &__actions {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 16px;
+
+    button {
+      width: 100%;
+    }
+  }
+
+  // Success emblem with a soft ring that ripples out once.
+  &__emblem {
+    position: relative;
+    width: 88px;
+    height: 88px;
+    display: grid;
+    place-items: center;
+    margin-bottom: 12px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #3ddc97, var(--success));
+    color: #fff;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 16px 36px -12px color-mix(in srgb, var(--success) 70%, transparent);
+    animation: pop 0.55s var(--ease-spring) both;
+
+    &::after {
+      content: '';
+      position: absolute;
+      inset: -1px;
+      border-radius: 50%;
+      border: 2px solid var(--success);
+      animation: ripple 1.4s 0.3s var(--ease-out) both;
+    }
+
+    .mi {
+      font-size: 48px;
+      font-variation-settings: 'FILL' 1, 'wght' 600, 'opsz' 48;
+    }
+  }
+
+  &__tiles {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-top: 20px;
+
+    button {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      min-height: 104px;
+      padding: 18px 6px 14px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: var(--glass);
+      -webkit-backdrop-filter: blur(16px);
+      backdrop-filter: blur(16px);
+      box-shadow: inset 0 1px 0 var(--glass-edge), var(--shadow-sm);
+      color: var(--ink);
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.16s var(--ease-out), border-color 0.16s ease;
+
+      .mi {
+        width: 44px;
+        height: 44px;
+        display: grid;
+        place-items: center;
+        border-radius: 14px;
+        background: var(--accent-soft);
+        color: var(--accent-ink);
+        font-size: 24px;
+      }
+
+      &:hover {
+        border-color: var(--line-strong);
+      }
+
+      &:active {
+        transform: scale(0.96);
+      }
+    }
+  }
+}
+
+// ---------- map screen ----------
+.map-screen {
+  position: relative;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--map-bg);
+
+  &__map {
+    position: absolute;
+    inset: 0;
+  }
+
+  // Overlay containers let map gestures through everywhere except on their own cards.
+  &__top,
+  &__bottom,
+  &__floor {
+    position: absolute;
+    z-index: 10;
+    pointer-events: none;
+
+    > * {
+      pointer-events: auto;
+    }
+  }
+
+  &__top {
+    top: 0;
+    left: 0;
+    right: 0;
+    padding: calc(var(--gutter) + var(--safe-top)) var(--gutter) 0;
+
+    @media (min-width: 860px) {
+      right: auto;
+      width: 440px;
+      padding: 20px 20px 0;
+    }
+  }
+
+  &__floor {
+    right: var(--gutter);
+    z-index: 9;
+    transition: top 0.3s var(--ease-out);
+
+    @media (min-width: 860px) {
+      right: 20px;
+    }
+  }
+
+  &__bottom {
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 0 var(--gutter) calc(var(--gutter) + var(--safe-bottom));
+
+    // Tablet / desktop: floating side panel instead of a full-width card.
+    @media (min-width: 860px) {
+      right: auto;
+      width: 440px;
+      padding: 0 20px 20px;
+    }
+  }
+
+  &__toast {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 6px 8px 16px;
+    border-radius: 20px;
+    color: var(--ink);
+    font-size: 0.9rem;
+    font-weight: 500;
+    animation: sheet-up 0.35s var(--ease-out) both;
+
+    > .mi {
+      color: var(--danger);
+    }
+
+    span:nth-child(2) {
+      flex: 1;
+      line-height: 1.35;
+    }
+
+    .icon-btn .mi {
+      font-size: 20px;
+      color: var(--muted);
+    }
+  }
+}
+
+// ---------- calculating ----------
+.calculating {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+
+  &__orbit {
+    position: relative;
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--accent-soft);
+
+    &::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: conic-gradient(from 0deg, transparent 0 60%, var(--accent) 100%);
+      -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px));
+      mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px));
+      animation: spin 0.9s linear infinite;
+    }
+  }
+
+  &__text {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  &__name {
+    font-size: 1.1rem;
+    font-weight: 650;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+// ---------- navigation header ----------
+.nav-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 8px 10px 8px 8px;
+  border-radius: var(--radius-lg);
+  animation: header-in 0.4s var(--ease-out) both;
+
+  &__tile {
+    width: 46px;
+    height: 46px;
+    border-radius: 15px;
+    font-size: 23px;
+  }
+
+  &__text {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__name {
+    font-weight: 650;
+    font-size: 1rem;
+    letter-spacing: -0.015em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+// ---------- arrival ----------
+.arrived {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 4px;
+  padding-top: 24px;
+
+  &__check {
+    width: 64px;
+    height: 64px;
+    display: grid;
+    place-items: center;
+    margin-bottom: 10px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #3ddc97, var(--success));
+    color: #fff;
+    box-shadow: 0 12px 28px -10px color-mix(in srgb, var(--success) 70%, transparent);
+    animation: pop 0.5s var(--ease-spring) both;
+
+    .mi {
+      font-size: 36px;
+      font-variation-settings: 'FILL' 1, 'wght' 600, 'opsz' 40;
+    }
+  }
+
+  &__eyebrow {
+    color: var(--success);
+  }
+
+  &__place {
+    font-size: 1.4rem;
+    font-weight: 650;
+    letter-spacing: -0.03em;
+    line-height: 1.2;
+  }
+
+  &__thanks {
+    color: var(--muted);
+    font-size: 0.92rem;
+  }
+
+  &__done {
+    width: 100%;
+    margin-top: 16px;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pop {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+}
+
+@keyframes ripple {
+  from {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  to {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+@keyframes header-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}

@@ -1,0 +1,242 @@
+.search {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  animation: search-in 0.28s var(--ease-out);
+
+  &__bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: calc(10px + var(--safe-top)) 12px 10px 6px;
+    border-bottom: 1px solid var(--line);
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(22px) saturate(1.6);
+    backdrop-filter: blur(22px) saturate(1.6);
+  }
+
+  &__field {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 52px;
+    padding: 0 8px 0 16px;
+    border-radius: 18px;
+    background: var(--fill);
+    box-shadow: inset 0 0 0 1px var(--line);
+    transition: box-shadow 0.16s ease, background-color 0.16s ease;
+
+    &:focus-within {
+      background: var(--bg-elevated);
+      box-shadow: inset 0 0 0 1.5px var(--accent), 0 0 0 4px var(--accent-soft);
+    }
+  }
+
+  &__field-icon {
+    color: var(--muted);
+    font-size: 21px;
+  }
+
+  &__input {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    border: 0;
+    background: transparent;
+    color: var(--ink);
+    font-size: 16px; // keeps iOS from zooming on focus
+    outline: none;
+
+    &::placeholder {
+      color: var(--muted);
+    }
+
+    &::-webkit-search-cancel-button {
+      display: none;
+    }
+  }
+
+  &__clear {
+    width: 32px;
+    height: 32px;
+    display: grid;
+    place-items: center;
+    border: 0;
+    border-radius: 50%;
+    background: var(--fill-hover);
+    color: var(--ink);
+    cursor: pointer;
+
+    .mi {
+      font-size: 17px;
+    }
+  }
+
+  &__body {
+    flex: 1;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 14px 12px calc(24px + var(--safe-bottom));
+  }
+
+  &__count {
+    padding: 0 8px 6px;
+  }
+
+  &__group + &__group {
+    margin-top: 10px;
+  }
+
+  &__floor {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 0;
+    padding: 12px 8px 8px;
+    background: linear-gradient(var(--bg) 75%, transparent);
+    font-size: 0.95rem;
+    font-weight: 650;
+    letter-spacing: -0.015em;
+    color: var(--ink);
+  }
+
+  &__here {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.78rem;
+    font-weight: 550;
+    color: var(--accent-ink);
+  }
+
+  &__list {
+    list-style: none;
+    margin: 0;
+    padding: 4px;
+    border-radius: 22px;
+    background: var(--bg-elevated);
+    box-shadow: inset 0 0 0 1px var(--line), var(--shadow-sm);
+
+    li + li .search__row::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 66px;
+      right: 14px;
+      height: 1px;
+      background: var(--line);
+    }
+  }
+
+  &__row {
+    position: relative;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-height: 64px;
+    padding: 10px 10px 10px 10px;
+    border: 0;
+    border-radius: 18px;
+    background: none;
+    color: var(--ink);
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 0.14s ease;
+
+    &:hover,
+    &:focus-visible {
+      background: var(--fill);
+    }
+
+    &:active {
+      background: var(--fill-hover);
+    }
+  }
+
+  &__row-icon {
+    position: relative;
+    width: 42px;
+    height: 42px;
+    display: grid;
+    place-items: center;
+    border-radius: 13px;
+    font-size: 22px;
+    isolation: isolate;
+  }
+
+  // Tinted square behind the icon, derived from the icon's own colour so every category stays legible.
+  &__row-tint {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    opacity: 0.13;
+  }
+
+  &__row-name {
+    flex: 1;
+    min-width: 0;
+    font-weight: 550;
+    font-size: 0.98rem;
+    letter-spacing: -0.01em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  &__row-time {
+    flex-shrink: 0;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+
+  &__row-go {
+    color: var(--muted);
+    font-size: 20px;
+    opacity: 0.7;
+  }
+
+  &__empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 64px 24px;
+    color: var(--muted);
+    text-align: center;
+
+    strong {
+      color: var(--ink);
+      font-weight: 600;
+    }
+  }
+
+  &__empty-icon {
+    width: 64px;
+    height: 64px;
+    display: grid;
+    place-items: center;
+    margin-bottom: 8px;
+    border-radius: 20px;
+    background: var(--fill);
+    font-size: 30px;
+  }
+}
+
+@keyframes search-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
